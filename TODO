@@ -1,0 +1,5 @@
+next:
+- build bpf .o from kernel samples (simplest one)
+- run loader on x86 and make it generate message (load prog)
+- cross-compile protobuf + custom bpf loader (based on test read/write) for arm64
+- copy messages + custom bpf loader to arm64 target, load and check if it works.
