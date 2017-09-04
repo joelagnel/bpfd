@@ -1,0 +1,26 @@
+// See README.txt for information and build instructions.
+//
+// Note: START and END tags are used in comments to define sections used in
+// tutorials.  They are not part of the syntax for Protocol Buffers.
+//
+// To get an in-depth walkthrough of this file and the related examples, see:
+// https://developers.google.com/protocol-buffers/docs/tutorials
+
+// [START declaration]
+syntax = "proto2";
+package bpfd;
+// [END declaration]
+
+// [START messages]
+message LoadProgram {
+  optional int32 bpf_prog_type = 1;
+  optional bytes bpf_insn = 2;
+  optional int32 insns_cnt = 3;
+  optional int32 strict_alignment = 4;
+  optional string license = 5;
+  optional uint32 kernel_version = 6;
+  optional int32 log_buf_sz = 7;
+  optional int32 log_level = 8;
+}
+
+// [END messages]
