@@ -12,10 +12,28 @@ package bpfd;
 // [END declaration]
 
 // [START messages]
+
+// BPF INSN  - serialize to prevent arch/abi issues
+// struct bpf_insn {
+//	__u8	code;		/* opcode */
+//	__u8	dst_reg:4;	/* dest register */
+//	__u8	src_reg:4;	/* source register */
+//	__s16	off;		/* signed offset */
+//	__s32	imm;		/* signed immediate constant */
+// };
+message BpfInsn {
+	optional uint32 code = 1;
+	optional uint32 dst_reg = 2;
+	optional uint32 src_reg = 3;
+	optional sint32 off = 4;
+	optional sint32 imm = 5;
+}
+
+// bpf load program API (bpf_prog_load)
 message LoadProgram {
   optional int32 bpf_prog_type = 1;
-  optional bytes bpf_insn = 2;
-  optional int32 insns_cnt = 3;
+  repeated BpfInsn bpf_insn = 2;
+  optional int32 insns_cnt = 3;		// May not be needed?
   optional string license = 4;
   optional uint32 kernel_version = 5;
   optional int32 log_buf_sz = 6;
