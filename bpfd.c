@@ -22,7 +22,7 @@ int read_avail_filter(char *tracefs) {
 		return fd;
 	}
 
-	printf("START TRACEFS READ: %s\n", tracef);
+	printf("START_TRACEFS_READ\n");
 	fflush(stdout);
 
 	while ((len = read(fd, &buf, 4096)) > 0)
@@ -30,7 +30,7 @@ int read_avail_filter(char *tracefs) {
 
 	close(fd);
 
-	printf("END TRACEFS READ: %s\n", tracef);
+	printf("END_TRACEFS_READ\n");
 	return 0;
 
 }
