@@ -1,6 +1,6 @@
 /*
- * Borrowed from the bcc project.
  * Copyright (c) 2015 PLUMgrid, Inc.
+ * Borrowed from bcc project.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,6 +43,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <linux/if_alg.h>
 
 #include "libbpf.h"
 #include "perf_reader.h"
@@ -220,6 +221,115 @@ static void bpf_print_hints(char *log)
 }
 #define ROUND_UP(x, n) (((x) + (n) - 1u) & ~((n) - 1u))
 
+int bpf_obj_get_info(int prog_map_fd, void *info, int *info_len)
+{
+  union bpf_attr attr;
+  int err;
+
+  memset(&attr, 0, sizeof(attr));
+  attr.info.bpf_fd = prog_map_fd;
+  attr.info.info_len = *info_len;
+  attr.info.info = ptr_to_u64(info);
+
+  err = syscall(__NR_bpf, BPF_OBJ_GET_INFO_BY_FD, &attr, sizeof(attr));
+  if (!err)
+          *info_len = attr.info.info_len;
+
+  return err;
+}
+
+int bpf_prog_compute_tag(const struct bpf_insn *insns, int prog_len,
+                         unsigned long long *ptag)
+{
+  struct sockaddr_alg alg = {
+    .salg_family    = AF_ALG,
+    .salg_type      = "hash",
+    .salg_name      = "sha1",
+  };
+  int shafd = socket(AF_ALG, SOCK_SEQPACKET, 0);
+  if (shafd < 0) {
+    fprintf(stderr, "sha1 socket not available %s\n", strerror(errno));
+    return -1;
+  }
+  int ret = bind(shafd, (struct sockaddr *)&alg, sizeof(alg));
+  if (ret < 0) {
+    fprintf(stderr, "sha1 bind fail %s\n", strerror(errno));
+    close(shafd);
+    return ret;
+  }
+  int shafd2 = accept(shafd, NULL, 0);
+  if (shafd2 < 0) {
+    fprintf(stderr, "sha1 accept fail %s\n", strerror(errno));
+    close(shafd);
+    return -1;
+  }
+  struct bpf_insn prog[prog_len / 8];
+  bool map_ld_seen = false;
+  int i;
+  for (i = 0; i < prog_len / 8; i++) {
+    prog[i] = insns[i];
+    if (insns[i].code == (BPF_LD | BPF_DW | BPF_IMM) &&
+        insns[i].src_reg == BPF_PSEUDO_MAP_FD &&
+        !map_ld_seen) {
+      prog[i].imm = 0;
+      map_ld_seen = true;
+    } else if (insns[i].code == 0 && map_ld_seen) {
+      prog[i].imm = 0;
+      map_ld_seen = false;
+    } else {
+      map_ld_seen = false;
+    }
+  }
+  ret = write(shafd2, prog, prog_len);
+  if (ret != prog_len) {
+    fprintf(stderr, "sha1 write fail %s\n", strerror(errno));
+    close(shafd2);
+    close(shafd);
+    return -1;
+  }
+
+  union {
+	  unsigned char sha[20];
+	  unsigned long long tag;
+  } u = {};
+  ret = read(shafd2, u.sha, 20);
+  if (ret != 20) {
+    fprintf(stderr, "sha1 read fail %s\n", strerror(errno));
+    close(shafd2);
+    close(shafd);
+    return -1;
+  }
+  *ptag = __builtin_bswap64(u.tag);
+  return 0;
+}
+
+int bpf_prog_get_tag(int fd, unsigned long long *ptag)
+{
+  char fmt[64];
+  snprintf(fmt, sizeof(fmt), "/proc/self/fdinfo/%d", fd);
+  FILE * f = fopen(fmt, "r");
+  if (!f) {
+/*    fprintf(stderr, "failed to open fdinfo %s\n", strerror(errno));*/
+    return -1;
+  }
+  fgets(fmt, sizeof(fmt), f); // pos
+  fgets(fmt, sizeof(fmt), f); // flags
+  fgets(fmt, sizeof(fmt), f); // mnt_id
+  fgets(fmt, sizeof(fmt), f); // prog_type
+  fgets(fmt, sizeof(fmt), f); // prog_jited
+  fgets(fmt, sizeof(fmt), f); // prog_tag
+  fclose(f);
+  char *p = strchr(fmt, ':');
+  if (!p) {
+/*    fprintf(stderr, "broken fdinfo %s\n", fmt);*/
+    return -2;
+  }
+  unsigned long long tag = 0;
+  sscanf(p + 1, "%llx", &tag);
+  *ptag = tag;
+  return 0;
+}
+
 int bpf_prog_load(enum bpf_prog_type prog_type,
                   const struct bpf_insn *insns, int prog_len,
                   const char *license, unsigned kern_version,
@@ -393,12 +503,10 @@ void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, con
 {
   int kfd;
   char buf[256];
-  char new_name[128];
+  char event_alias[128];
   struct perf_reader *reader = NULL;
   static char *event_type = "kprobe";
-  int n;
 
-  snprintf(new_name, sizeof(new_name), "%s_bcc_%d", ev_name, getpid());
   reader = perf_reader_new(cb, NULL, NULL, cb_cookie, probe_perf_reader_page_cnt);
   if (!reader)
     goto error;
@@ -410,8 +518,9 @@ void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, con
     goto error;
   }
 
+  snprintf(event_alias, sizeof(event_alias), "%s_bcc_%d", ev_name, getpid());
   snprintf(buf, sizeof(buf), "%c:%ss/%s %s", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r',
-			event_type, new_name, fn_name);
+			event_type, event_alias, fn_name);
   if (write(kfd, buf, strlen(buf)) < 0) {
     if (errno == EINVAL)
       fprintf(stderr, "check dmesg output for possible cause\n");
@@ -420,24 +529,10 @@ void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, con
   }
   close(kfd);
 
-  if (access("/sys/kernel/debug/tracing/instances", F_OK) != -1) {
-    snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/bcc_%d", getpid());
-    if (access(buf, F_OK) == -1) {
-      if (mkdir(buf, 0755) == -1)
-        goto retry;
-    }
-    n = snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/bcc_%d/events/%ss/%s",
-             getpid(), event_type, new_name);
-    if (n < sizeof(buf) && bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd) == 0)
-	  goto out;
-    snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/bcc_%d", getpid());
-    rmdir(buf);
-  }
-retry:
-  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%ss/%s", event_type, new_name);
+  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%ss/%s", event_type, event_alias);
   if (bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd) < 0)
     goto error;
-out:
+
   return reader;
 
 error:
@@ -512,15 +607,12 @@ void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type, con
                         pid_t pid, int cpu, int group_fd,
                         perf_reader_cb cb, void *cb_cookie)
 {
-  int kfd;
   char buf[PATH_MAX];
-  char new_name[256];
+  char event_alias[PATH_MAX];
   struct perf_reader *reader = NULL;
   static char *event_type = "uprobe";
-  int ns_fd = -1;
-  int n;
+  int res, kfd = -1, ns_fd = -1;
 
-  snprintf(new_name, sizeof(new_name), "%s_bcc_%d", ev_name, getpid());
   reader = perf_reader_new(cb, NULL, NULL, cb_cookie, probe_perf_reader_page_cnt);
   if (!reader)
     goto error;
@@ -532,11 +624,15 @@ void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type, con
     goto error;
   }
 
-  n = snprintf(buf, sizeof(buf), "%c:%ss/%s %s:0x%lx", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r',
-			event_type, new_name, binary_path, offset);
-  if (n >= sizeof(buf)) {
-    fprintf(stderr, "Name too long for uprobe; ev_name (%s) is probably too long\n", ev_name);
-    close(kfd);
+  res = snprintf(event_alias, sizeof(event_alias), "%s_bcc_%d", ev_name, getpid());
+  if (res < 0 || res >= sizeof(event_alias)) {
+    fprintf(stderr, "Event name (%s) is too long for buffer\n", ev_name);
+    goto error;
+  }
+  res = snprintf(buf, sizeof(buf), "%c:%ss/%s %s:0x%lx", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r',
+			event_type, event_alias, binary_path, offset);
+  if (res < 0 || res >= sizeof(buf)) {
+    fprintf(stderr, "Event alias (%s) too long for buffer\n", event_alias);
     goto error;
   }
 
@@ -544,20 +640,21 @@ void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type, con
   if (write(kfd, buf, strlen(buf)) < 0) {
     if (errno == EINVAL)
       fprintf(stderr, "check dmesg output for possible cause\n");
-    close(kfd);
     goto error;
   }
   close(kfd);
   exit_mount_ns(ns_fd);
   ns_fd = -1;
 
-  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%ss/%s", event_type, new_name);
+  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%ss/%s", event_type, event_alias);
   if (bpf_attach_tracing_event(progfd, buf, reader, pid, cpu, group_fd) < 0)
     goto error;
 
   return reader;
 
 error:
+  if (kfd >= 0)
+    close(kfd);
   exit_mount_ns(ns_fd);
   perf_reader_free(reader);
   return NULL;
@@ -565,36 +662,37 @@ error:
 
 static int bpf_detach_probe(const char *ev_name, const char *event_type)
 {
-  int kfd;
-  char buf[256];
+  int kfd, res;
+  char buf[PATH_MAX];
   snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/%s_events", event_type);
   kfd = open(buf, O_WRONLY | O_APPEND, 0);
   if (kfd < 0) {
     fprintf(stderr, "open(%s): %s\n", buf, strerror(errno));
-    return -1;
+    goto error;
   }
 
-  snprintf(buf, sizeof(buf), "-:%ss/%s_bcc_%d", event_type, ev_name, getpid());
+  res = snprintf(buf, sizeof(buf), "-:%ss/%s_bcc_%d", event_type, ev_name, getpid());
+  if (res < 0 || res >= sizeof(buf)) {
+    fprintf(stderr, "snprintf(%s): %d\n", ev_name, res);
+    goto error;
+  }
   if (write(kfd, buf, strlen(buf)) < 0) {
     fprintf(stderr, "write(%s): %s\n", buf, strerror(errno));
-    close(kfd);
-    return -1;
+    goto error;
   }
-  close(kfd);
 
+  close(kfd);
   return 0;
+
+error:
+  if (kfd >= 0)
+    close(kfd);
+  return -1;
 }
 
 int bpf_detach_kprobe(const char *ev_name)
 {
-  char buf[256];
-  int ret = bpf_detach_probe(ev_name, "kprobe");
-  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/instances/bcc_%d", getpid());
-  if (access(buf, F_OK) != -1) {
-    rmdir(buf);
-  }
-
-  return ret;
+  return bpf_detach_probe(ev_name, "kprobe");
 }
 
 int bpf_detach_uprobe(const char *ev_name)

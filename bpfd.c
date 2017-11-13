@@ -4,6 +4,36 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <linux/bpf.h>
+
+#include <arpa/inet.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <linux/bpf.h>
+#include <linux/bpf_common.h>
+#include <linux/if_packet.h>
+#include <linux/perf_event.h>
+#include <linux/pkt_cls.h>
+#include <linux/rtnetlink.h>
+#include <linux/sched.h>
+#include <linux/unistd.h>
+#include <linux/version.h>
+#include <net/ethernet.h>
+#include <net/if.h>
+#include <sched.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/ioctl.h>
+#include <sys/resource.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+#include "lib/bpf/libbpf.h"
 
 #define LINEBUF_SIZE  2000000
 #define LINE_TOKENS   10
@@ -38,6 +68,36 @@ int read_avail_filter(char *tracefs) {
 	printf("END_TRACEFS_READ\n");
 	return 0;
 
+}
+
+/* Command format: BPF_PROG_LOAD type prog_len license kern_version binary_data
+ *
+ * Prototype of lib call:
+ int bpf_prog_load(enum bpf_prog_type prog_type,
+ const struct bpf_insn *insns, int prog_len,
+ const char *license, unsigned kern_version,
+ char *log_buf, unsigned log_buf_size)
+ */
+int bpf_prog_load_handle(int type, char *bin_b64, int prog_len, char *license,
+			 unsigned int kern_version)
+{
+	int bin_len, ret;
+	char *bin_buf;
+	const struct bpf_insn *insns;
+
+	bin_len = strlen(bin_b64);
+	bin_buf = (char *)malloc(bin_len);
+
+	if (!base64_decode(bin_b64, bin_buf, bin_len))
+		return -1;
+
+	insns = (const struct bpf_insn *)bin_buf;
+
+	ret = bpf_prog_load((enum bpf_prog_type)type, insns, prog_len,
+			    (const char *)license, kern_version, NULL, 0);
+
+
+	printf("bpf_prog_load: ret=%d\n", ret);
 }
 
 void test_base64(char *file) {
@@ -132,8 +192,8 @@ int main(int argc, char **argv)
 			if (read_avail_filter(argstr) < 0)
 				goto invalid_command;
 		} else if (cmd && !strcmp(cmd, "BPF_PROG_LOAD")) {
-			int len, prog_len;
-			char *tok, *license, *bin_data, *type;
+			int len, prog_len, type;
+			char *tok, *license, *bin_data;
 			unsigned int kern_version;
 			/* Command format: BPF_PROG_LOAD type prog_len license kern_version binary_data
 			 *
@@ -147,8 +207,8 @@ int main(int argc, char **argv)
 			tok = strtok(argstr, " ");
 			if (strlen(tok) == len)
 				goto invalid_command;
-
-			type = tok;
+			if (!sscanf(tok, "%d ", &type))
+				goto invalid_command;
 
 			tok = strtok(NULL, " ");
 			if (!tok)
@@ -172,7 +232,8 @@ int main(int argc, char **argv)
 				goto invalid_command;
 			bin_data = tok;
 
-			printf("BPF_PROG_LOAD: %s %d %s %u %s\n", type, prog_len, license, kern_version, bin_data);
+			printf("BPF_PROG_LOAD: %d %d %s %u %s\n", type, prog_len, license, kern_version, bin_data);
+			bpf_prog_load_handle(type, bin_data, prog_len, license, kern_version);
 		} else {
 invalid_command:
 			printf("Command not recognized\n");
