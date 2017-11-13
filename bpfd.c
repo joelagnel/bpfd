@@ -5,7 +5,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#define LINEBUF_SIZE  100
+#define LINEBUF_SIZE  2000000
 #define LINE_TOKENS   10
 
 int base64_encode(unsigned char *source, size_t sourcelen, char *target, size_t targetlen);
@@ -56,7 +56,7 @@ void test_base64(char *file) {
 	strcat(fileout, file);
 	strcat(fileout, ".b64dec");
 
-	printf("Encoding and then decoding %s into %s, filesize is %d\n", file, fileout, size);
+	printf("Encoding and then decoding %s into %s, filesize is %d\n", file, fileout, (int)size);
 
 	encoded = (char *)malloc((size * 4) + 1);
 	encoded[(size * 4)] = 0;
@@ -67,7 +67,7 @@ void test_base64(char *file) {
 
 	ret = base64_encode(filebuf, size, encoded, size*4);
 
-	printf("encoded len: %d\n", strlen(encoded));
+	printf("encoded len: %d\n", (int)strlen(encoded));
 
 	printf("encoded stat: %s\n", encoded);
 
@@ -130,10 +130,53 @@ int main(int argc, char **argv)
 
 		if (cmd && !strcmp(cmd, "READ_AVAILABLE_FILTER_FUNCTIONS")) {
 			if (read_avail_filter(argstr) < 0)
-				continue;
-		}
-		else
+				goto invalid_command;
+		} else if (cmd && !strcmp(cmd, "BPF_PROG_LOAD")) {
+			int len, prog_len;
+			char *tok, *license, *bin_data, *type;
+			unsigned int kern_version;
+			/* Command format: BPF_PROG_LOAD type prog_len license kern_version binary_data
+			 *
+			 * Prototype of lib call:
+			int bpf_prog_load(enum bpf_prog_type prog_type,
+					const struct bpf_insn *insns, int prog_len,
+					const char *license, unsigned kern_version,
+					char *log_buf, unsigned log_buf_size)
+			*/
+			len = strlen(argstr);
+			tok = strtok(argstr, " ");
+			if (strlen(tok) == len)
+				goto invalid_command;
+
+			type = tok;
+
+			tok = strtok(NULL, " ");
+			if (!tok)
+				goto invalid_command;
+			if (!sscanf(tok, "%d ", &prog_len))
+				goto invalid_command;
+
+			tok = strtok(NULL, " ");
+			if (!tok)
+				goto invalid_command;
+			license = tok;
+
+			tok = strtok(NULL, " ");
+			if (!tok)
+				goto invalid_command;
+			if (!sscanf(tok, "%u ", &kern_version))
+				goto invalid_command;
+
+			tok = strtok(NULL, " ");
+			if (!tok)
+				goto invalid_command;
+			bin_data = tok;
+
+			printf("BPF_PROG_LOAD: %s %d %s %u %s\n", type, prog_len, license, kern_version, bin_data);
+		} else {
+invalid_command:
 			printf("Command not recognized\n");
+		}
 
 		fflush(stdout);
 	}
