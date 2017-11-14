@@ -3,10 +3,14 @@
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-ret=$(cat $DIR/TESTS | $DIR/../run_bpfd.sh | grep "ret=-")
+output=$(cat $DIR/TESTS | grep -v ";" | $DIR/../run_bpfd.sh)
+ret=$(echo $output | grep "ret=-")
 
 if [ x${ret} == "x" ]; then
 	echo "All tests pass"
+	if [ x$1 == "x-v" ]; then
+		echo ${output}
+	fi
 else
 	echo "Some tests failed, output: ${ret}"
 fi

@@ -195,13 +195,12 @@ int main(int argc, char **argv)
 			int len, prog_len, type;
 			char *tok, *license, *bin_data;
 			unsigned int kern_version;
-			/* Command format: BPF_PROG_LOAD type prog_len license kern_version binary_data
-			 *
+			/*
+			 * Command format: BPF_PROG_LOAD type prog_len license kern_version binary_data
 			 * Prototype of lib call:
-			int bpf_prog_load(enum bpf_prog_type prog_type,
-					const struct bpf_insn *insns, int prog_len,
-					const char *license, unsigned kern_version,
-					char *log_buf, unsigned log_buf_size)
+			 * int bpf_prog_load(enum bpf_prog_type prog_type,
+			 * const struct bpf_insn *insns, int prog_len,
+			 * const char *license, unsigned kern_version, char *log_buf, unsigned log_buf_size)
 			*/
 			len = strlen(argstr);
 			tok = strtok(argstr, " ");
@@ -232,8 +231,50 @@ int main(int argc, char **argv)
 				goto invalid_command;
 			bin_data = tok;
 
-			printf("BPF_PROG_LOAD: %d %d %s %u %s\n", type, prog_len, license, kern_version, bin_data);
 			bpf_prog_load_handle(type, bin_data, prog_len, license, kern_version);
+
+		} else if (cmd && !strcmp(cmd, "BPF_CREATE_MAP")) {
+			/*
+			 * Command format: BPF_CREATE_MAP map_type, table.key_size, table.leaf_size, table.max_entries, table.flags);
+			 * Prototype of lib call:
+			 * int bpf_create_map(enum bpf_map_type map_type, int key_size, int value_size, int max_entries, int map_flags)
+			 */
+			int ret, type, len, key_size, value_size, max_entries, map_flags;
+			char *tok;
+
+			len = strlen(argstr);
+			tok = strtok(argstr, " ");
+			if (strlen(tok) == len)
+				goto invalid_command;
+			if (!sscanf(tok, "%d ", &type))
+				goto invalid_command;
+
+			tok = strtok(NULL, " ");
+			if (!tok)
+				goto invalid_command;
+			if (!sscanf(tok, "%d ", &key_size))
+				goto invalid_command;
+
+			tok = strtok(NULL, " ");
+			if (!tok)
+				goto invalid_command;
+			if (!sscanf(tok, "%d ", &value_size))
+				goto invalid_command;
+
+			tok = strtok(NULL, " ");
+			if (!tok)
+				goto invalid_command;
+			if (!sscanf(tok, "%d ", &max_entries))
+				goto invalid_command;
+
+			tok = strtok(NULL, " ");
+			if (!tok)
+				goto invalid_command;
+			if (!sscanf(tok, "%d ", &map_flags))
+				goto invalid_command;
+
+			ret = bpf_create_map((enum bpf_map_type)type, key_size, value_size, max_entries, map_flags);
+			printf("bpf_create_map: ret=%d\n", ret);
 		} else {
 invalid_command:
 			printf("Command not recognized\n");
