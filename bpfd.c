@@ -6,40 +6,14 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <linux/bpf.h>
-
 #include <arpa/inet.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <limits.h>
-#include <linux/bpf.h>
-#include <linux/bpf_common.h>
-#include <linux/if_packet.h>
-#include <linux/perf_event.h>
-#include <linux/pkt_cls.h>
-#include <linux/rtnetlink.h>
-#include <linux/sched.h>
-#include <linux/unistd.h>
-#include <linux/version.h>
-#include <net/ethernet.h>
-#include <net/if.h>
-#include <sched.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/ioctl.h>
-#include <sys/resource.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
 
+#include "base64.h"
+#include "bpfd.h"
 #include "lib/bpf/libbpf.h"
 
 #define LINEBUF_SIZE  2000000
 #define LINE_TOKENS   10
-
-int base64_encode(unsigned char *source, size_t sourcelen, char *target, size_t targetlen);
-size_t base64_decode( char *source, unsigned char *target, size_t targetlen);
 
 int read_avail_filter(char *tracefs) {
 	char tracef[100], ch;
@@ -98,50 +72,6 @@ int bpf_prog_load_handle(int type, char *bin_b64, int prog_len, char *license,
 
 
 	printf("bpf_prog_load: ret=%d\n", ret);
-}
-
-void test_base64(char *file) {
-	struct stat st;
-	char *fileout, *encoded, *filebuf;
-	size_t size;
-	int ret;
-	FILE *fp;
-	char *target;
-
-	stat(file, &st);
-	size = st.st_size;
-
-	fileout = (char *)malloc(strlen(file) + 1 + 4);
-	fileout[0] = 0;
-	strcat(fileout, file);
-	strcat(fileout, ".b64dec");
-
-	printf("Encoding and then decoding %s into %s, filesize is %d\n", file, fileout, (int)size);
-
-	encoded = (char *)malloc((size * 4) + 1);
-	encoded[(size * 4)] = 0;
-
-	filebuf = (char *)malloc(size);
-	fp = fopen(file, "rb");
-	fread(filebuf, size, 1, fp);
-
-	ret = base64_encode(filebuf, size, encoded, size*4);
-
-	printf("encoded len: %d\n", (int)strlen(encoded));
-
-	printf("encoded stat: %s\n", encoded);
-
-	target = (char *)malloc(size);
-
-	ret = base64_decode(encoded, target, size);
-
-	fp = fopen(fileout, "wb");
-
-	printf("fp=%p ret=%d fileout=%s\n", (void *)fp, ret, fileout);
-
-	fwrite(target, size, 1, fp);
-
-	fclose(fp);
 }
 
 int main(int argc, char **argv)
@@ -209,27 +139,10 @@ int main(int argc, char **argv)
 			if (!sscanf(tok, "%d ", &type))
 				goto invalid_command;
 
-			tok = strtok(NULL, " ");
-			if (!tok)
-				goto invalid_command;
-			if (!sscanf(tok, "%d ", &prog_len))
-				goto invalid_command;
-
-			tok = strtok(NULL, " ");
-			if (!tok)
-				goto invalid_command;
-			license = tok;
-
-			tok = strtok(NULL, " ");
-			if (!tok)
-				goto invalid_command;
-			if (!sscanf(tok, "%u ", &kern_version))
-				goto invalid_command;
-
-			tok = strtok(NULL, " ");
-			if (!tok)
-				goto invalid_command;
-			bin_data = tok;
+			PARSE_INT(prog_len);
+			PARSE_STR(license);
+			PARSE_UINT(kern_version);
+			PARSE_STR(bin_data);
 
 			bpf_prog_load_handle(type, bin_data, prog_len, license, kern_version);
 
@@ -249,29 +162,10 @@ int main(int argc, char **argv)
 			if (!sscanf(tok, "%d ", &type))
 				goto invalid_command;
 
-			tok = strtok(NULL, " ");
-			if (!tok)
-				goto invalid_command;
-			if (!sscanf(tok, "%d ", &key_size))
-				goto invalid_command;
-
-			tok = strtok(NULL, " ");
-			if (!tok)
-				goto invalid_command;
-			if (!sscanf(tok, "%d ", &value_size))
-				goto invalid_command;
-
-			tok = strtok(NULL, " ");
-			if (!tok)
-				goto invalid_command;
-			if (!sscanf(tok, "%d ", &max_entries))
-				goto invalid_command;
-
-			tok = strtok(NULL, " ");
-			if (!tok)
-				goto invalid_command;
-			if (!sscanf(tok, "%d ", &map_flags))
-				goto invalid_command;
+			PARSE_INT(key_size);
+			PARSE_INT(value_size);
+			PARSE_INT(max_entries);
+			PARSE_INT(map_flags);
 
 			ret = bpf_create_map((enum bpf_map_type)type, key_size, value_size, max_entries, map_flags);
 			printf("bpf_create_map: ret=%d\n", ret);

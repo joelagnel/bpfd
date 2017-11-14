@@ -7,6 +7,10 @@ Author: freecode http://freecode-freecode.blogspot.com/
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 /**
 * characters used for Base64 encoding
@@ -216,4 +220,48 @@ size_t base64_decode( char *source, unsigned char *target, size_t targetlen )
 
 	free( src );
 	return converted;
+}
+
+void test_base64(char *file) {
+	struct stat st;
+	char *fileout, *encoded, *filebuf;
+	size_t size;
+	int ret;
+	FILE *fp;
+	char *target;
+
+	stat(file, &st);
+	size = st.st_size;
+
+	fileout = (char *)malloc(strlen(file) + 1 + 4);
+	fileout[0] = 0;
+	strcat(fileout, file);
+	strcat(fileout, ".b64dec");
+
+	printf("Encoding and then decoding %s into %s, filesize is %d\n", file, fileout, (int)size);
+
+	encoded = (char *)malloc((size * 4) + 1);
+	encoded[(size * 4)] = 0;
+
+	filebuf = (char *)malloc(size);
+	fp = fopen(file, "rb");
+	fread(filebuf, size, 1, fp);
+
+	ret = base64_encode(filebuf, size, encoded, size*4);
+
+	printf("encoded len: %d\n", (int)strlen(encoded));
+
+	printf("encoded stat: %s\n", encoded);
+
+	target = (char *)malloc(size);
+
+	ret = base64_decode(encoded, target, size);
+
+	fp = fopen(fileout, "wb");
+
+	printf("fp=%p ret=%d fileout=%s\n", (void *)fp, ret, fileout);
+
+	fwrite(target, size, 1, fp);
+
+	fclose(fp);
 }
