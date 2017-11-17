@@ -22,9 +22,10 @@ build/libbpf_bpfd.so: build/libbpf.o build/perf_reader.o
 
 build/bpfd: $(BPFD_SRC) src/base64.c build/libbpf_bpfd.so
 	mkdir -p build
+	$(CC) $(CFLAGS) -c -o build/utils.o src/utils.c
 	$(CC) $(CFLAGS) -c -o build/base64.o src/base64.c
 	$(CC) $(CFLAGS) -c -o build/bpfd.o $(BPFD_SRC)
-	$(CC) $(CFLAGS) build/base64.o build/bpfd.o -o $@ -lbpf_bpfd
+	$(CC) $(CFLAGS) build/base64.o build/utils.o build/bpfd.o -o $@ -lbpf_bpfd
 
 clean:
 	rm -rf build

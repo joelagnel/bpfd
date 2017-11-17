@@ -18,37 +18,10 @@
 #include <linux/bpf.h>
 #include <arpa/inet.h>
 
-#include "base64.h"
 #include "bpfd.h"
-#include "lib/bpf/libbpf.h"
 
 #define LINEBUF_SIZE  2000000
 #define LINE_TOKENS   10
-
-int read_avail_filter(char *tracefs) {
-	char tracef[100], ch;
-	char buf[4096];
-	int len, fd;
-
-	tracef[0] = 0;
-	strcat(tracef, tracefs);
-	strcat(tracef, "/");
-	strcat(tracef, "available_filter_functions");
-
-	fd = open(tracef, O_RDONLY);
-	if (fd < 0) {
-		printf("Open failed, ignoring\n");
-		return fd;
-	}
-
-	while ((len = read(fd, &buf, 4096)) > 0)
-		write(1, buf, len);
-
-	close(fd);
-
-	return 0;
-
-}
 
 /* Command format: BPF_PROG_LOAD type prog_len license kern_version binary_data
  *
@@ -128,7 +101,7 @@ int main(int argc, char **argv)
 		fflush(stdout);
 
 		if (cmd && !strcmp(cmd, "READ_AVAILABLE_FILTER_FUNCTIONS")) {
-			if (read_avail_filter(argstr) < 0)
+			if (cat_tracefs_file(argstr, "available_filter_functions") < 0)
 				goto invalid_command;
 		} else if (cmd && !strcmp(cmd, "BPF_PROG_LOAD")) {
 			int len, prog_len, type;
