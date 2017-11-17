@@ -41,15 +41,11 @@ int read_avail_filter(char *tracefs) {
 		return fd;
 	}
 
-	printf("START_TRACEFS_READ\n");
-	fflush(stdout);
-
 	while ((len = read(fd, &buf, 4096)) > 0)
 		write(1, buf, len);
 
 	close(fd);
 
-	printf("END_TRACEFS_READ\n");
 	return 0;
 
 }
@@ -128,6 +124,9 @@ int main(int argc, char **argv)
 			}
 		}
 
+		printf("START_BPFD_OUTPUT\n");
+		fflush(stdout);
+
 		if (cmd && !strcmp(cmd, "READ_AVAILABLE_FILTER_FUNCTIONS")) {
 			if (read_avail_filter(argstr) < 0)
 				goto invalid_command;
@@ -184,6 +183,7 @@ invalid_command:
 			printf("Command not recognized\n");
 		}
 
+		printf("END_BPFD_OUTPUT\n");
 		fflush(stdout);
 	}
 	return 0;
