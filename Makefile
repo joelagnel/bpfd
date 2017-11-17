@@ -1,28 +1,30 @@
-all: libbpf.o
+BPFD_SRC        := src/bpfd.c
+LIBBPF_SRC      := src/lib/bpf/libbpf.c
+PERF_READER_SRC := src/lib/bpf/perf_reader.c
+INCLUDE := -I/home/joelaf/repo/linux-mainline/usr/include/ -I./src/lib/bpf/compat/
 
-BPFD_SRC        := bpfd.c
-LIBBPF_SRC      := lib/bpf/libbpf.c
-PERF_READER_SRC := lib/bpf/perf_reader.c
-INCLUDE := -I/home/joelaf/repo/linux-mainline/usr/include/ -I./lib/bpf/compat/
-
-CFLAGS := $(INCLUDE) -L./
+CFLAGS := $(INCLUDE) -L./build/
 # CC := aarch64-linux-gnu-gcc-4.9
 
-libbpf.o: $(LIBBPF_SRC)
+all: build/bpfd
+
+build/libbpf.o: $(LIBBPF_SRC)
+	mkdir -p build
 	$(CC) $(CFLAGS) -fPIC -c -o $@ $^
 
-perf_reader.o: $(PERF_READER_SRC)
+build/perf_reader.o: $(PERF_READER_SRC)
+	mkdir -p build
 	$(CC) $(CFLAGS) -fPIC -c -o $@ $^
 
-libbpf_bpfd.so: libbpf.o perf_reader.o
+build/libbpf_bpfd.so: build/libbpf.o build/perf_reader.o
+	mkdir -p build
 	$(CC) $(CFLAGS) -shared -o $@ $^
 
-bpfd: $(BPFD_SRC) base64.c libbpf_bpfd.so
-	$(CC) $(CFLAGS) -c -o base64.o base64.c
-	$(CC) $(CFLAGS) -c -o bpfd.o $(BPFD_SRC)
-	$(CC) $(CFLAGS) base64.o bpfd.o -o $@ -lbpf_bpfd
-
-all: bpfd
+build/bpfd: $(BPFD_SRC) src/base64.c build/libbpf_bpfd.so
+	mkdir -p build
+	$(CC) $(CFLAGS) -c -o build/base64.o src/base64.c
+	$(CC) $(CFLAGS) -c -o build/bpfd.o $(BPFD_SRC)
+	$(CC) $(CFLAGS) build/base64.o build/bpfd.o -o $@ -lbpf_bpfd
 
 clean:
-	rm -f bpfd *.o *.so
+	rm -rf build
