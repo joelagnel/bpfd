@@ -95,8 +95,8 @@ int main(int argc, char **argv)
 
 	while (fgets(line_buf, LINEBUF_SIZE, stdin)) {
 		int fd;
-		line_buf[strcspn(line_buf, "\n")] = 0;
 		line_buf[strcspn(line_buf, "\r\n")] = 0;
+		line_buf[strcspn(line_buf, "\n")] = 0;
 
 		lineptr = line_buf;
 		len = strlen(lineptr);
