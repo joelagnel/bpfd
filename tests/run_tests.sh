@@ -3,7 +3,7 @@
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-output=$(cat $DIR/TESTS | grep -v ";" | $DIR/../run_bpfd.sh)
+output=$(cat $DIR/TESTS | grep -v ";" | $DIR/../build/bpfd)
 ret=$(echo $output | grep "ret=-")
 
 if [ x${ret} == "x" ]; then
