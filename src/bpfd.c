@@ -100,7 +100,7 @@ int main(int argc, char **argv)
 		printf("START_BPFD_OUTPUT\n");
 		fflush(stdout);
 
-		if (cmd && !strcmp(cmd, "READ_AVAILABLE_FILTER_FUNCTIONS")) {
+		if (cmd && !strcmp(cmd, "GET_AVAIL_FILTER_FUNCS")) {
 			if (cat_tracefs_file(argstr, "available_filter_functions") < 0)
 				goto invalid_command;
 		} else if (cmd && !strcmp(cmd, "BPF_PROG_LOAD")) {
