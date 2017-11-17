@@ -100,10 +100,21 @@ int main(int argc, char **argv)
 		printf("START_BPFD_OUTPUT\n");
 		fflush(stdout);
 
-		if (cmd && !strcmp(cmd, "GET_AVAIL_FILTER_FUNCS")) {
+		if (!cmd)
+			goto invalid_command;
+
+		if (!strcmp(cmd, "GET_AVAIL_FILTER_FUNCS")) {
+
 			if (cat_tracefs_file(argstr, "available_filter_functions") < 0)
 				goto invalid_command;
-		} else if (cmd && !strcmp(cmd, "BPF_PROG_LOAD")) {
+
+		} else if (!strcmp(cmd, "GET_KPROBES_BLACKLIST")) {
+
+			if (cat_tracefs_file(argstr, "../kprobes/blacklist") < 0)
+				goto invalid_command;
+
+		} else if (!strcmp(cmd, "BPF_PROG_LOAD")) {
+
 			int len, prog_len, type;
 			char *tok, *license, *bin_data;
 			unsigned int kern_version;
@@ -128,12 +139,13 @@ int main(int argc, char **argv)
 
 			bpf_prog_load_handle(type, bin_data, prog_len, license, kern_version);
 
-		} else if (cmd && !strcmp(cmd, "BPF_CREATE_MAP")) {
+		} else if (!strcmp(cmd, "BPF_CREATE_MAP")) {
 			/*
 			 * Command format: BPF_CREATE_MAP map_type, table.key_size, table.leaf_size, table.max_entries, table.flags);
 			 * Prototype of lib call:
 			 * int bpf_create_map(enum bpf_map_type map_type, int key_size, int value_size, int max_entries, int map_flags)
 			 */
+
 			int ret, type, len, key_size, value_size, max_entries, map_flags;
 			char *tok;
 
@@ -151,7 +163,9 @@ int main(int argc, char **argv)
 
 			ret = bpf_create_map((enum bpf_map_type)type, key_size, value_size, max_entries, map_flags);
 			printf("bpf_create_map: ret=%d\n", ret);
+
 		} else {
+
 invalid_command:
 			printf("Command not recognized\n");
 		}
