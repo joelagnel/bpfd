@@ -15,6 +15,9 @@
 #include <unistd.h>
 #include <string.h>
 #include "utils.h"
+#include <dirent.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 /* Read a file on the local fs to stdout */
 int cat_file(char *path) {
@@ -46,4 +49,34 @@ int cat_tracefs_file(char *tracefs, char *fn) {
 	strcat(tracef, fn);
 
 	return cat_file(tracef);
+}
+
+int cat_dir(char *path, int dirs_only)
+{
+	DIR *dp;
+	struct dirent *ep;
+
+	dp = opendir(path);
+	if (!dp)
+		return -1;
+
+	while (ep = readdir(dp)) {
+		struct stat st;
+
+		if (strcmp(ep->d_name, ".") == 0 || strcmp(ep->d_name, "..") == 0)
+			continue;
+
+		if (dirs_only) {
+			if (fstatat(dirfd(dp), ep->d_name, &st, 0) < 0)
+				continue;
+
+			if (!S_ISDIR(st.st_mode))
+				continue;
+		}
+
+		printf("%s\n", ep->d_name);
+	}
+	closedir (dp);
+
+	return 0;
 }

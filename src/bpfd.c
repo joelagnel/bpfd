@@ -53,6 +53,29 @@ int bpf_prog_load_handle(int type, char *bin_b64, int prog_len, char *license,
 	printf("bpf_prog_load: ret=%d\n", ret);
 }
 
+int get_trace_events(char *tracefs, char *category)
+{
+	char tracef[256];
+
+	tracef[0] = 0;
+	strcat(tracef, tracefs);
+	strcat(tracef, "/events/");
+	strcat(tracef, category);
+
+	return cat_dir(tracef, 1);
+}
+
+int get_trace_events_categories(char *tracefs)
+{
+	char tracef[256];
+
+	tracef[0] = 0;
+	strcat(tracef, tracefs);
+	strcat(tracef, "/events");
+
+	return cat_dir(tracef, 1);
+}
+
 int main(int argc, char **argv)
 {
 	char line_buf[LINEBUF_SIZE];
@@ -111,6 +134,26 @@ int main(int argc, char **argv)
 		} else if (!strcmp(cmd, "GET_KPROBES_BLACKLIST")) {
 
 			if (cat_tracefs_file(argstr, "../kprobes/blacklist") < 0)
+				goto invalid_command;
+
+		} else if (!strcmp(cmd, "GET_TRACE_EVENTS_CATEGORIES")) {
+
+			if (get_trace_events_categories(argstr) < 0)
+				goto invalid_command;
+	
+		} else if (!strcmp(cmd, "GET_TRACE_EVENTS")) {
+			int len;
+			char *tok, *category, *tracefs;
+
+			len = strlen(argstr);
+			tok = strtok(argstr, " ");
+			if (strlen(tok) == len)
+				goto invalid_command;
+			tracefs = tok;
+
+			PARSE_STR(category);
+
+			if (get_trace_events(tracefs, category) < 0)
 				goto invalid_command;
 
 		} else if (!strcmp(cmd, "BPF_PROG_LOAD")) {
