@@ -33,25 +33,22 @@
 		goto invalid_command;		\
 	var = tok;
 
-#define PARSE_FIRST_INT(var)		\
+#define PARSE_FIRST_TOK				\
 	len = strlen(argstr);			\
 	tok = strtok(argstr, " ");		\
 	if (strlen(tok) == len)			\
-		goto invalid_command;		\
+		goto invalid_command;
+
+#define PARSE_FIRST_INT(var)		\
+	PARSE_FIRST_TOK					\
 	if (!sscanf(tok, "%d ", &var))	\
 		goto invalid_command;
 
 #define PARSE_FIRST_UINT(var)		\
-	len = strlen(argstr);			\
-	tok = strtok(argstr, " ");		\
-	if (strlen(tok) == len)			\
-		goto invalid_command;		\
+	PARSE_FIRST_TOK					\
 	if (!sscanf(tok, "%u ", &var))	\
 		goto invalid_command;
 
 #define PARSE_FIRST_STR(var)		\
-	len = strlen(argstr);			\
-	tok = strtok(argstr, " ");		\
-	if (strlen(tok) == len)			\
-		goto invalid_command;		\
+	PARSE_FIRST_TOK					\
 	var = tok;
