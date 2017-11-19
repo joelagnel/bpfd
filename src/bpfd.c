@@ -145,12 +145,7 @@ int main(int argc, char **argv)
 			int len;
 			char *tok, *category, *tracefs;
 
-			len = strlen(argstr);
-			tok = strtok(argstr, " ");
-			if (strlen(tok) == len)
-				goto invalid_command;
-			tracefs = tok;
-
+			PARSE_FIRST_STR(tracefs);
 			PARSE_STR(category);
 
 			if (get_trace_events(tracefs, category) < 0)
@@ -168,13 +163,7 @@ int main(int argc, char **argv)
 			 * const struct bpf_insn *insns, int prog_len,
 			 * const char *license, unsigned kern_version, char *log_buf, unsigned log_buf_size)
 			*/
-			len = strlen(argstr);
-			tok = strtok(argstr, " ");
-			if (strlen(tok) == len)
-				goto invalid_command;
-			if (!sscanf(tok, "%d ", &type))
-				goto invalid_command;
-
+			PARSE_FIRST_INT(type);
 			PARSE_INT(prog_len);
 			PARSE_STR(license);
 			PARSE_UINT(kern_version);
@@ -191,13 +180,7 @@ int main(int argc, char **argv)
 			 *		int group_fd, perf_reader_cb cb, void *cb_cookie)
 			 */
 
-			len = strlen(argstr);
-			tok = strtok(argstr, " ");
-			if (strlen(tok) == len)
-				goto invalid_command;
-			if (!sscanf(tok, "%d ", &prog_fd))
-				goto invalid_command;
-
+			PARSE_FIRST_INT(prog_fd);
 			PARSE_STR(category);
 			PARSE_STR(tpname);
 			PARSE_INT(pid);
@@ -224,13 +207,7 @@ int main(int argc, char **argv)
 			int ret, type, len, key_size, value_size, max_entries, map_flags;
 			char *tok;
 
-			len = strlen(argstr);
-			tok = strtok(argstr, " ");
-			if (strlen(tok) == len)
-				goto invalid_command;
-			if (!sscanf(tok, "%d ", &type))
-				goto invalid_command;
-
+			PARSE_FIRST_INT(type);
 			PARSE_INT(key_size);
 			PARSE_INT(value_size);
 			PARSE_INT(max_entries);
