@@ -14,3 +14,15 @@ if [ x${ret} == "x" ]; then
 else
 	echo "Some tests failed, output: ${ret}"
 fi
+
+output=$(cat $DIR/TEST_attach_tracepoint | grep -v ";" | $DIR/../build/bpfd)
+ret=$(echo $output | grep "ret=-")
+
+if [ x${ret} == "x" ]; then
+	echo "All tests pass"
+	if [ x$1 == "x-v" ]; then
+		echo ${output}
+	fi
+else
+	echo "Some tests failed, output: ${ret}"
+fi

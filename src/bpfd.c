@@ -182,6 +182,38 @@ int main(int argc, char **argv)
 
 			bpf_prog_load_handle(type, bin_data, prog_len, license, kern_version);
 
+		} else if (!strcmp(cmd, "BPF_ATTACH_TRACEPOINT")) {
+			int len, ret, prog_fd, group_fd, pid, cpu;
+			char *tok, *tpname, *category;
+			/*
+			 * void * bpf_attach_tracepoint(int progfd, const char *tp_category,
+			 *		const char *tp_name, int pid, int cpu,
+			 *		int group_fd, perf_reader_cb cb, void *cb_cookie)
+			 */
+
+			len = strlen(argstr);
+			tok = strtok(argstr, " ");
+			if (strlen(tok) == len)
+				goto invalid_command;
+			if (!sscanf(tok, "%d ", &prog_fd))
+				goto invalid_command;
+
+			PARSE_STR(category);
+			PARSE_STR(tpname);
+			PARSE_INT(pid);
+			PARSE_INT(cpu);
+			PARSE_INT(group_fd);
+
+			/*
+			 * TODO: We're leaking a struct perf_reader here, we should free it somewhere.
+			 */
+			if (!bpf_attach_tracepoint(prog_fd, category, tpname, pid, cpu, group_fd, NULL, NULL))
+				ret = -1;
+			else
+				ret = prog_fd;
+
+			printf("bpf_attach_tracepoint: ret=%d\n", ret);
+
 		} else if (!strcmp(cmd, "BPF_CREATE_MAP")) {
 			/*
 			 * Command format: BPF_CREATE_MAP map_type, table.key_size, table.leaf_size, table.max_entries, table.flags);
