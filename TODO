@@ -1,6 +1,6 @@
 To get opensnoop working:
-- add support for kprobe/kretprobe attach and verify they work
-- add support for open_perf_buffer
+- add support for kprobe/kretprobe attach and verify they work - DONE
+- add support for open_perf_buffer and callbacks
 - add support kprobe_poll, note that opensnoop doesn't need map reads to work, just perf.
 
 To get stackcount working:
