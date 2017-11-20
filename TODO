@@ -1,3 +1,12 @@
+To get opensnoop working:
+- add support for kprobe/kretprobe attach and verify they work
+- add support for open_perf_buffer
+- add support kprobe_poll, note that opensnoop doesn't need map reads to work, just perf.
+
+To get stackcount working:
+- add support for map read
+
+old:
 next:
 - build bpf .o from kernel samples (simplest one)
 - run loader on x86 and make it generate message (load prog)
