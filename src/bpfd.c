@@ -171,6 +171,33 @@ int main(int argc, char **argv)
 
 			bpf_prog_load_handle(type, bin_data, prog_len, license, kern_version);
 
+		} else if (!strcmp(cmd, "BPF_ATTACH_KPROBE")) {
+			int len, ret, prog_fd, group_fd, pid, cpu, type;
+			char *tok, *ev_name, *fn_name;
+			/*
+			 * void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, const char *ev_name,
+			 *							const char *fn_name, pid_t pid, int cpu, int group_fd,
+			 *							perf_reader_cb cb, void *cb_cookie)
+			 */
+
+			PARSE_FIRST_INT(prog_fd);
+			PARSE_INT(type);
+			PARSE_STR(ev_name);
+			PARSE_STR(fn_name);
+			PARSE_INT(pid);
+			PARSE_INT(cpu);
+			PARSE_INT(group_fd);
+
+			/*
+			 * TODO: We're leaking a struct perf_reader here, we should free it somewhere.
+			 */
+			if (!bpf_attach_kprobe(prog_fd, type, ev_name, fn_name, pid, cpu, group_fd, NULL, NULL))
+				ret = -1;
+			else
+				ret = prog_fd;
+
+			printf("bpf_attach_kprobe: ret=%d\n", ret);
+
 		} else if (!strcmp(cmd, "BPF_ATTACH_TRACEPOINT")) {
 			int len, ret, prog_fd, group_fd, pid, cpu;
 			char *tok, *tpname, *category;
