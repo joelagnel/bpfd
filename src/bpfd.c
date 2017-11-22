@@ -79,7 +79,7 @@ int get_trace_events_categories(char *tracefs)
 int main(int argc, char **argv)
 {
 	char line_buf[LINEBUF_SIZE];
-	char *cmd, *lineptr, *argstr;
+	char *cmd, *lineptr, *argstr, *tok;
 	int len, fd;
 
 	if (argc == 2 && !strcmp(argv[1], "base64"))
@@ -143,7 +143,7 @@ int main(int argc, char **argv)
 	
 		} else if (!strcmp(cmd, "GET_TRACE_EVENTS")) {
 			int len;
-			char *tok, *category, *tracefs;
+			char *category, *tracefs;
 
 			PARSE_FIRST_STR(tracefs);
 			PARSE_STR(category);
@@ -154,7 +154,7 @@ int main(int argc, char **argv)
 		} else if (!strcmp(cmd, "BPF_PROG_LOAD")) {
 
 			int len, prog_len, type;
-			char *tok, *license, *bin_data;
+			char *license, *bin_data;
 			unsigned int kern_version;
 			/*
 			 * Command format: BPF_PROG_LOAD type prog_len license kern_version binary_data
@@ -173,7 +173,7 @@ int main(int argc, char **argv)
 
 		} else if (!strcmp(cmd, "BPF_ATTACH_KPROBE")) {
 			int len, ret, prog_fd, group_fd, pid, cpu, type;
-			char *tok, *ev_name, *fn_name;
+			char *ev_name, *fn_name;
 			/*
 			 * void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, const char *ev_name,
 			 *							const char *fn_name, pid_t pid, int cpu, int group_fd,
@@ -200,7 +200,7 @@ int main(int argc, char **argv)
 
 		} else if (!strcmp(cmd, "BPF_ATTACH_TRACEPOINT")) {
 			int len, ret, prog_fd, group_fd, pid, cpu;
-			char *tok, *tpname, *category;
+			char *tpname, *category;
 			/*
 			 * void * bpf_attach_tracepoint(int progfd, const char *tp_category,
 			 *		const char *tp_name, int pid, int cpu,
@@ -232,7 +232,6 @@ int main(int argc, char **argv)
 			 */
 
 			int ret, type, len, key_size, value_size, max_entries, map_flags;
-			char *tok;
 
 			PARSE_FIRST_INT(type);
 			PARSE_INT(key_size);
@@ -242,6 +241,16 @@ int main(int argc, char **argv)
 
 			ret = bpf_create_map((enum bpf_map_type)type, key_size, value_size, max_entries, map_flags);
 			printf("bpf_create_map: ret=%d\n", ret);
+
+		} else if (!strcmp(cmd, "BPF_OPEN_PERF_BUFFER")) {
+			int pid, cpu, page_cnt, ret;
+
+			PARSE_FIRST_INT(pid);
+			PARSE_INT(cpu);
+			PARSE_INT(page_cnt);
+
+			ret = bpf_remote_open_perf_buffer(pid, cpu, page_cnt);
+			printf("bpf_open_perf_buffer: ret=%d\n", ret);
 
 		} else {
 

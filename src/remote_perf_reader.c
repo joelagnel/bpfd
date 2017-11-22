@@ -1,0 +1,69 @@
+/*
+ * BPFd (Berkeley Packet Filter daemon)
+ * Support for perf readers.
+ *
+ * Copyright (C) 2017 Joel Fernandes <agnel.joel@gmail.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+
+/*
+ * This file's functionality should be properly abstracted
+ * within libbpf.c and perf_reader.c. For now, duplicate the
+ * struct here
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <linux/bpf.h>
+#include <arpa/inet.h>
+
+#include "bpfd.h"
+
+#define MAX_READERS 1024
+
+struct perf_reader {
+  perf_reader_cb cb;
+  perf_reader_raw_cb raw_cb;
+  perf_reader_lost_cb lost_cb;
+  void *cb_cookie; // to be returned in the cb
+  void *buf; // for keeping segmented data
+  size_t buf_size;
+  void *base;
+  int page_size;
+  int page_cnt;
+  int fd;
+  uint32_t type;
+  uint64_t sample_type;
+};
+
+struct perf_reader *remote_readers[MAX_READERS];
+
+void remote_raw_reader_cb(void *cookie, void *raw, int size)
+{
+}
+
+void remote_lost_reader_cb(uint64_t lost)
+{
+}
+
+int bpf_remote_open_perf_buffer(int pid, int cpu, int page_cnt)
+{
+	struct perf_reader *reader;
+
+	reader = bpf_open_perf_buffer(remote_raw_reader_cb, remote_lost_reader_cb,
+								  NULL, pid, cpu, page_cnt);
+	if (!reader)
+		return -1;
+
+	reader->cb_cookie = reader;
+	remote_readers[reader->fd] = reader;
+	return reader->fd;
+}

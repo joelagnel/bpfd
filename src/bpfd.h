@@ -52,3 +52,5 @@
 #define PARSE_FIRST_STR(var)		\
 	PARSE_FIRST_TOK					\
 	var = tok;
+
+int bpf_remote_open_perf_buffer(int pid, int cpu, int page_cnt);
