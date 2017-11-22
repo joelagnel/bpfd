@@ -27,6 +27,13 @@
 	if (!sscanf(tok, "%u ", &var))		\
 		goto invalid_command;
 
+#define PARSE_ULL(var)				\
+	tok = strtok(NULL, " ");		\
+	if (!tok)				\
+		goto invalid_command;		\
+	if (!sscanf(tok, "%llu ", &var))		\
+		goto invalid_command;
+
 #define PARSE_STR(var)				\
 	tok = strtok(NULL, " ");		\
 	if (!tok)				\

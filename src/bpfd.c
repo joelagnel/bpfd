@@ -10,6 +10,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
@@ -49,7 +50,6 @@ int bpf_prog_load_handle(int type, char *bin_b64, int prog_len, char *license,
 	ret = bpf_prog_load((enum bpf_prog_type)type, insns, prog_len,
 			    (const char *)license, kern_version, NULL, 0);
 
-
 	printf("bpf_prog_load: ret=%d\n", ret);
 }
 
@@ -74,6 +74,68 @@ int get_trace_events_categories(char *tracefs)
 	strcat(tracef, "/events");
 
 	return cat_dir(tracef, 1);
+}
+
+int bpf_remote_update_elem(int map_fd, char *kstr, int klen,
+		char *lstr, int llen, unsigned long flags)
+{
+	int ret = -ENOMEM;
+	void *kbin, *lbin;
+
+	kbin = (void *)malloc(klen);
+	if (!kbin)
+		goto err_update;
+
+	lbin = (void *)malloc(llen);
+	if (!lbin)
+		goto err_update;
+
+	ret = -EINVAL;
+	if (!base64_decode(kstr, kbin, klen))
+		goto err_update;
+
+	if (!base64_decode(lstr, lbin, llen))
+		goto err_update;
+
+	ret = bpf_update_elem(map_fd, kbin, lbin, flags);
+err_update:
+	if (kbin) free(kbin);
+	if (lbin) free(lbin);
+	return ret;
+}
+
+char *bpf_remote_lookup_elem(int map_fd, char *kstr, int klen, int llen)
+{
+	void *lbin, *kbin;
+	char *lstr, *rets = NULL;
+	int ret;
+
+	kbin = (void *)malloc(klen);
+	if (!kbin)
+		goto err_update;
+
+	lbin = (void *)malloc(llen);
+	if (!lbin)
+		goto err_update;
+
+	lstr = (char *)malloc(llen * 4);
+	if (!lstr)
+		goto err_update;
+
+	if (!base64_decode(kstr, kbin, klen))
+		goto err_update;
+
+	if (!bpf_lookup_elem(map_fd, kbin, lbin))
+		goto err_update;
+
+	if (!base64_encode(lbin, llen, lstr, llen*4))
+		goto err_update;
+	rets = (char *)lstr;
+
+err_update:
+	if (lbin) free(lbin);
+	if (kbin) free(kbin);
+	return rets;
 }
 
 int main(int argc, char **argv)
@@ -252,6 +314,35 @@ int main(int argc, char **argv)
 			ret = bpf_remote_open_perf_buffer(pid, cpu, page_cnt);
 			printf("bpf_open_perf_buffer: ret=%d\n", ret);
 
+		} else if (!strcmp(cmd, "BPF_UPDATE_ELEM")) {
+			int map_fd, klen, llen, ret;
+			unsigned long long flags;
+			char *tok, *kstr, *lstr;
+
+			PARSE_FIRST_INT(map_fd);
+			PARSE_STR(kstr);
+			PARSE_INT(klen);
+			PARSE_STR(lstr);
+			PARSE_INT(llen);
+			PARSE_ULL(flags);
+
+			ret = bpf_remote_update_elem(map_fd, kstr, klen, lstr, llen, flags);
+			printf("bpf_update_elem: ret=%d\n", ret);
+
+		} else if (!strcmp(cmd, "BPF_LOOKUP_ELEM")) {
+			int map_fd, klen, llen;
+			char *tok, *kstr, *lstr;
+
+			PARSE_FIRST_INT(map_fd);
+			PARSE_STR(kstr);
+			PARSE_INT(klen);
+			PARSE_INT(llen);
+
+			lstr = bpf_remote_lookup_elem(map_fd, kstr, klen, llen);
+			if (!lstr)
+				printf("bpf_update_elem: ret=%d\n", -1);
+			else
+				printf("%s\n", lstr);
 		} else {
 
 invalid_command:
