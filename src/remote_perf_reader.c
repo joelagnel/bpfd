@@ -80,17 +80,19 @@ int bpf_remote_open_perf_buffer(int pid, int cpu, int page_cnt)
 	return reader->fd;
 }
 
-void remote_perf_reader_poll(int *fds, int len, int timeout)
+int remote_perf_reader_poll(int *fds, int len, int timeout)
 {
 	struct perf_reader **readers;
-	int i;
+	int i, ret;
 
 	readers = (struct perf_reader **)malloc(len * sizeof(void *));
 
 	for (i = 0; i < len; i++)
 		readers[i] = remote_readers[fds[i]];
 
-	perf_reader_poll(len, readers, timeout);
+	ret = perf_reader_poll(len, readers, timeout);
 
 	free(readers);
+
+	return ret;
 }

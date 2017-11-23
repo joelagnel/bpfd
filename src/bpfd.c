@@ -345,7 +345,7 @@ int main(int argc, char **argv)
 				printf("%s\n", lstr);
 
 		} else if (!strcmp(cmd, "PERF_READER_POLL")) {
-			int len, *fds, i, timeout;
+			int len, *fds, i, timeout, ret;
 
 			PARSE_FIRST_INT(timeout);
 			PARSE_INT(len);
@@ -358,7 +358,9 @@ int main(int argc, char **argv)
 				PARSE_INT(fds[i]);
 			}
 
-			remote_perf_reader_poll(fds, len, timeout);
+			ret = remote_perf_reader_poll(fds, len, timeout);
+			if (ret < 0)
+				printf("perf_reader_poll: ret=%d\n", ret);
 		} else {
 
 invalid_command:
