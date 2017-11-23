@@ -340,9 +340,25 @@ int main(int argc, char **argv)
 
 			lstr = bpf_remote_lookup_elem(map_fd, kstr, klen, llen);
 			if (!lstr)
-				printf("bpf_update_elem: ret=%d\n", -1);
+				printf("bpf_lookup_elem: ret=%d\n", -1);
 			else
 				printf("%s\n", lstr);
+
+		} else if (!strcmp(cmd, "PERF_READER_POLL")) {
+			int len, *fds, i, timeout;
+
+			PARSE_FIRST_INT(timeout);
+			PARSE_INT(len);
+
+			fds = (void *)malloc(len);
+			if (!fds)
+				printf("perf_reader_poll: ret=%d\n", -ENOMEM);
+
+			for (i = 0; i < len; i++) {
+				PARSE_INT(fds[i]);
+			}
+
+			remote_perf_reader_poll(fds, len, timeout);
 		} else {
 
 invalid_command:

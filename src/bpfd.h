@@ -61,3 +61,4 @@
 	var = tok;
 
 int bpf_remote_open_perf_buffer(int pid, int cpu, int page_cnt);
+void remote_perf_reader_poll(int *fds, int len, int timeout);

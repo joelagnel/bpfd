@@ -24,7 +24,7 @@
 #include <sys/types.h>
 #include <linux/bpf.h>
 #include <arpa/inet.h>
-
+#include "lib/bpf/perf_reader.h"
 #include "bpfd.h"
 
 #define MAX_READERS 1024
@@ -48,6 +48,18 @@ struct perf_reader *remote_readers[MAX_READERS];
 
 void remote_raw_reader_cb(void *cookie, void *raw, int size)
 {
+	struct perf_reader *reader = cookie;
+	char *raw_str;
+
+	raw_str = malloc(size * 4);
+
+	if (!base64_encode(raw, size, raw_str, size*4))
+		printf("raw_cb: b64 encode failed for reader fd=%d\n",
+			   reader->fd);
+
+	printf("%d %d %s\n", reader->fd, size, raw_str);
+
+	free(raw_str);
 }
 
 void remote_lost_reader_cb(uint64_t lost)
@@ -66,4 +78,19 @@ int bpf_remote_open_perf_buffer(int pid, int cpu, int page_cnt)
 	reader->cb_cookie = reader;
 	remote_readers[reader->fd] = reader;
 	return reader->fd;
+}
+
+void remote_perf_reader_poll(int *fds, int len, int timeout)
+{
+	struct perf_reader **readers;
+	int i;
+
+	readers = (struct perf_reader **)malloc(len * sizeof(void *));
+
+	for (i = 0; i < len; i++)
+		readers[i] = remote_readers[fds[i]];
+
+	perf_reader_poll(len, readers, timeout);
+
+	free(readers);
 }
