@@ -5,7 +5,7 @@ To get opensnoop working:
 - add support kprobe_poll, note that opensnoop doesn't need map reads to work, just perf.
 
 To get stackcount working:
-- add support for map read
+- support lib.bpf_get_first_key and next_key
 
 old:
 next:
