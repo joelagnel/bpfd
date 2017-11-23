@@ -119,22 +119,71 @@ char *bpf_remote_lookup_elem(int map_fd, char *kstr, int klen, int llen)
 		goto err_update;
 
 	lstr = (char *)malloc(llen * 4);
-	if (!lstr)
+
+	if (!lstr ||
+		!base64_decode(kstr, kbin, klen) ||
+		(bpf_lookup_elem(map_fd, kbin, lbin) < 0))
 		goto err_update;
 
-	if (!base64_decode(kstr, kbin, klen))
-		goto err_update;
-
-	if (!bpf_lookup_elem(map_fd, kbin, lbin))
-		goto err_update;
-
-	if (!base64_encode(lbin, llen, lstr, llen*4))
-		goto err_update;
-	rets = (char *)lstr;
+	if (base64_encode(lbin, llen, lstr, llen*4))
+		rets = (char *)lstr;
 
 err_update:
 	if (lbin) free(lbin);
 	if (kbin) free(kbin);
+	if (!rets && lstr) free(lstr);
+	return rets;
+}
+
+char *bpf_remote_get_first_key(int map_fd, int klen)
+{
+	void *kbin;
+	char *kstr, *rets = NULL;
+
+	kbin = (void *)malloc(klen);
+	if (!kbin)
+		goto err_get;
+
+	kstr = (char *)malloc(klen * 4);
+	if (!kstr || bpf_get_first_key(map_fd, kbin, klen) < 0)
+		goto err_get;
+
+	if (base64_encode(kbin, klen, kstr, klen*4))
+		rets = kstr;
+err_get:
+	if (kbin) free(kbin);
+	if (!rets && kstr) free(kstr);
+	return rets;
+}
+
+char *bpf_remote_get_next_key(int map_fd, char *kstr, int klen)
+{
+	void *kbin, *next_kbin;
+	char *next_kstr, *rets = NULL;
+	int ret;
+
+	kbin = (void *)malloc(klen);
+	if (!kbin)
+		goto err_update;
+
+	next_kbin = (void *)malloc(klen);
+	if (!next_kbin)
+		goto err_update;
+
+	next_kstr = (char *)malloc(klen * 4);
+
+	if (!next_kstr ||
+		!base64_decode(kstr, kbin, klen) ||
+		(bpf_get_next_key(map_fd, kbin, next_kbin) < 0))
+		goto err_update;
+
+	if (base64_encode(next_kbin, klen, next_kstr, klen*4))
+		rets = (char *)next_kstr;
+
+err_update:
+	if (kbin) free(kbin);
+	if (next_kbin) free(next_kbin);
+	if (!rets && next_kstr) free(next_kstr);
 	return rets;
 }
 
@@ -343,6 +392,36 @@ int main(int argc, char **argv)
 				printf("bpf_lookup_elem: ret=%d\n", -1);
 			else
 				printf("%s\n", lstr);
+			if (lstr) free(lstr);
+
+		} else if (!strcmp(cmd, "BPF_GET_FIRST_KEY")) {
+			int map_fd, klen;
+			char *tok, *kstr;
+
+			PARSE_FIRST_INT(map_fd);
+			PARSE_INT(klen);
+
+			kstr = bpf_remote_get_first_key(map_fd, klen);
+			if (!kstr)
+				printf("bpf_get_first_key: ret=%d\n", -1);
+			else
+				printf("%s\n", kstr);
+			if (kstr) free(kstr);
+
+		} else if (!strcmp(cmd, "BPF_GET_NEXT_KEY")) {
+			int map_fd, klen;
+			char *tok, *kstr, *next_kstr;
+
+			PARSE_FIRST_INT(map_fd);
+			PARSE_STR(kstr);
+			PARSE_INT(klen);
+
+			next_kstr = bpf_remote_get_next_key(map_fd, kstr, klen);
+			if (!next_kstr)
+				printf("bpf_get_next_key: ret=%d\n", -1);
+			else
+				printf("%s\n", next_kstr);
+			if (next_kstr) free(next_kstr);
 
 		} else if (!strcmp(cmd, "PERF_READER_POLL")) {
 			int len, *fds, i, timeout, ret;
