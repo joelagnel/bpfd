@@ -1,11 +1,11 @@
-To get opensnoop working:
-- add support for kprobe/kretprobe attach and verify they work - DONE
-- add support for open_perf_buffer and callbacks
-        - need to get map update/lookup working otherwise perf wont work
-- add support kprobe_poll, note that opensnoop doesn't need map reads to work, just perf.
-
 To get stackcount working:
-- support lib.bpf_get_first_key and next_key
+    why doesn't it finish in bounded time?
+
+Get syscount work:
+    Already working, but make script read from /proc on target
+
+Get filecount working:
+    Make delitem work
 
 old:
 next:
