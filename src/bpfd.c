@@ -187,6 +187,26 @@ err_update:
 	return rets;
 }
 
+int bpf_remote_delete_elem(int map_fd, char *kstr, int klen)
+{
+	void *kbin;
+	int ret = -ENOMEM;
+
+	kbin = (void *)malloc(klen);
+	if (!kbin)
+		goto err_update;
+
+	ret = -1;
+	if (!base64_decode(kstr, kbin, klen))
+		goto err_update;
+
+	ret = bpf_delete_elem(map_fd, kbin);
+
+err_update:
+	if (kbin) free(kbin);
+	return ret;
+}
+
 int main(int argc, char **argv)
 {
 	char line_buf[LINEBUF_SIZE];
@@ -422,6 +442,17 @@ int main(int argc, char **argv)
 			else
 				printf("%s\n", next_kstr);
 			if (next_kstr) free(next_kstr);
+
+		} else if (!strcmp(cmd, "BPF_DELETE_ELEM")) {
+			int map_fd, klen, ret;
+			char *tok, *kstr;
+
+			PARSE_FIRST_INT(map_fd);
+			PARSE_STR(kstr);
+			PARSE_INT(klen);
+
+			ret = bpf_remote_delete_elem(map_fd, kstr, klen);
+			printf("bpf_delete_elem: ret=%d\n", ret);
 
 		} else if (!strcmp(cmd, "PERF_READER_POLL")) {
 			int len, *fds, i, timeout, ret;
