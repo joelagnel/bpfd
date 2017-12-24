@@ -447,6 +447,8 @@ int main(int argc, char **argv)
 			int map_fd, klen, ret;
 			char *tok, *kstr;
 
+			printf("entered del elem\n");
+
 			PARSE_FIRST_INT(map_fd);
 			PARSE_STR(kstr);
 			PARSE_INT(klen);
