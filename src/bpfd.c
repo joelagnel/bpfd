@@ -235,6 +235,8 @@ int main(int argc, char **argv)
 	if (kvers_str)
 		kvers = atoi(kvers_str);
 
+	printf("STARTED_BPFD\n");
+
 	while (fgets(line_buf, LINEBUF_SIZE, stdin)) {
 		int fd;
 		line_buf[strcspn(line_buf, "\r\n")] = 0;
