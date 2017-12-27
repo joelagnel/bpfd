@@ -210,21 +210,18 @@ err_update:
 int main(int argc, char **argv)
 {
 	char line_buf[LINEBUF_SIZE];
-	char *cmd, *lineptr, *argstr, *tok;
-	int len, fd;
-
-	char *kvers_str = NULL;
-	int c, kvers = 2;
+	char *cmd, *lineptr, *argstr, *tok, *kvers_str = NULL;
+	int len, fd, c, kvers = -1;
 
 	opterr = 0;
-	while ((c = getopt (argc, argv, "abc:")) != -1)
+	while ((c = getopt (argc, argv, "k:")) != -1)
 		switch (c)
 		{
 			case 'k':
 				kvers_str = optarg;
 				break;
 			case '?':
-				if (optopt == 'c')
+				if (optopt == 'k')
 					fprintf(stderr, "Option -%c requires an argument.\n", optopt);
 				else if (isprint (optopt))
 					fprintf(stderr, "Unknown option `-%c'.\n", optopt);
@@ -235,8 +232,8 @@ int main(int argc, char **argv)
 				abort();
 		}
 
-	kvers = atoi(kvers_str);
-	printf("kvers : %d\n", kvers);
+	if (kvers_str)
+		kvers = atoi(kvers_str);
 
 	while (fgets(line_buf, LINEBUF_SIZE, stdin)) {
 		int fd;
@@ -308,7 +305,7 @@ int main(int argc, char **argv)
 
 			int len, prog_len, type;
 			char *license, *bin_data;
-			unsigned int kern_version;
+			unsigned int kern_version, kvdummy;
 			/*
 			 * Command format: BPF_PROG_LOAD type prog_len license kern_version binary_data
 			 * Prototype of lib call:
@@ -319,7 +316,12 @@ int main(int argc, char **argv)
 			PARSE_FIRST_INT(type);
 			PARSE_INT(prog_len);
 			PARSE_STR(license);
-			PARSE_UINT(kern_version);
+			if (kvers != -1) {
+				kern_version = kvers;
+				PARSE_UINT(kvdummy);  /* skip field */
+			} else {
+				PARSE_UINT(kern_version);
+			}
 			PARSE_STR(bin_data);
 
 			bpf_prog_load_handle(type, bin_data, prog_len, license, kern_version);
