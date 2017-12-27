@@ -33,7 +33,7 @@
  char *log_buf, unsigned log_buf_size)
  */
 int bpf_prog_load_handle(int type, char *bin_b64, int prog_len, char *license,
-			 unsigned int kern_version)
+		unsigned int kern_version)
 {
 	int bin_len, ret;
 	char *bin_buf;
@@ -48,7 +48,7 @@ int bpf_prog_load_handle(int type, char *bin_b64, int prog_len, char *license,
 	insns = (const struct bpf_insn *)bin_buf;
 
 	ret = bpf_prog_load((enum bpf_prog_type)type, insns, prog_len,
-			    (const char *)license, kern_version, NULL, 0);
+			(const char *)license, kern_version, NULL, 0);
 
 	printf("bpf_prog_load: ret=%d\n", ret);
 }
@@ -121,8 +121,8 @@ char *bpf_remote_lookup_elem(int map_fd, char *kstr, int klen, int llen)
 	lstr = (char *)malloc(llen * 4);
 
 	if (!lstr ||
-		!base64_decode(kstr, kbin, klen) ||
-		(bpf_lookup_elem(map_fd, kbin, lbin) < 0))
+			!base64_decode(kstr, kbin, klen) ||
+			(bpf_lookup_elem(map_fd, kbin, lbin) < 0))
 		goto err_update;
 
 	if (base64_encode(lbin, llen, lstr, llen*4))
@@ -173,8 +173,8 @@ char *bpf_remote_get_next_key(int map_fd, char *kstr, int klen)
 	next_kstr = (char *)malloc(klen * 4);
 
 	if (!next_kstr ||
-		!base64_decode(kstr, kbin, klen) ||
-		(bpf_get_next_key(map_fd, kbin, next_kbin) < 0))
+			!base64_decode(kstr, kbin, klen) ||
+			(bpf_get_next_key(map_fd, kbin, next_kbin) < 0))
 		goto err_update;
 
 	if (base64_encode(next_kbin, klen, next_kstr, klen*4))
@@ -213,8 +213,30 @@ int main(int argc, char **argv)
 	char *cmd, *lineptr, *argstr, *tok;
 	int len, fd;
 
-	if (argc == 2 && !strcmp(argv[1], "base64"))
-		test_base64("bpfd.c");
+	char *kvers_str = NULL;
+	int c, kvers = 2;
+
+	opterr = 0;
+	while ((c = getopt (argc, argv, "abc:")) != -1)
+		switch (c)
+		{
+			case 'k':
+				kvers_str = optarg;
+				break;
+			case '?':
+				if (optopt == 'c')
+					fprintf(stderr, "Option -%c requires an argument.\n", optopt);
+				else if (isprint (optopt))
+					fprintf(stderr, "Unknown option `-%c'.\n", optopt);
+				else
+					fprintf(stderr,"Unknown option character `\\x%x'.\n", optopt);
+				return 1;
+			default:
+				abort();
+		}
+
+	kvers = atoi(kvers_str);
+	printf("kvers : %d\n", kvers);
 
 	while (fgets(line_buf, LINEBUF_SIZE, stdin)) {
 		int fd;

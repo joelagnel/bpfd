@@ -3,10 +3,8 @@ LIBBPF_SRC      := src/lib/bpf/libbpf.c
 PERF_READER_SRC := src/lib/bpf/perf_reader.c
 INCLUDE := -I/home/joelaf/repo/linux-mainline/usr/include/ -I./src/lib/bpf/compat/
 
-CFLAGS := $(INCLUDE) -L./build/ -static
-CC := aarch64-linux-gnu-gcc-4.9
-AR := aarch64-linux-gnu-gcc-ar-4.9
-LD := aarch64-linux-gnu-ld
+CFLAGS := $(INCLUDE) -L./build/
+# CC := aarch64-linux-gnu-gcc-4.9
 
 all: build/bpfd
 
@@ -18,11 +16,11 @@ build/perf_reader.o: $(PERF_READER_SRC)
 	mkdir -p build
 	$(CC) $(CFLAGS) -fPIC -c -o $@ $^
 
-build/libbpf_bpfd.a: build/libbpf.o build/perf_reader.o
+build/libbpf_bpfd.so: build/libbpf.o build/perf_reader.o
 	mkdir -p build
-	$(AR) rcs $@ $^
+	$(CC) $(CFLAGS) -shared -o $@ $^
 
-build/bpfd: $(BPFD_SRCS) build/libbpf_bpfd.a
+build/bpfd: $(BPFD_SRCS) build/libbpf_bpfd.so
 	mkdir -p build
 	$(CC) $(CFLAGS) -c -o build/utils.o src/utils.c
 	$(CC) $(CFLAGS) -c -o build/base64.o src/base64.c
