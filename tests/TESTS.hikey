@@ -1,4 +1,5 @@
-; Program opensnoop
+; Program opensnoop. This TESTS file is specifically for hikey due to kernel version number for prog load
+; The other way to fix it is ./bpfd -k 264519
 
 BPF_CREATE_MAP 1 8 40 10240 0
 BPF_CREATE_MAP 4 4 4 2 0
