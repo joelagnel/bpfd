@@ -355,6 +355,14 @@ int main(int argc, char **argv)
 
 			printf("bpf_attach_kprobe: ret=%d\n", ret);
 
+		} else if (!strcmp(cmd, "BPF_DETACH_KPROBE")) {
+			int len, ret;
+			char *evname;
+
+			PARSE_FIRST_STR(evname);
+			ret = bpf_detach_kprobe(evname);
+			printf("bpf_detach_kprobe: ret=%d\n", ret);
+
 		} else if (!strcmp(cmd, "BPF_ATTACH_TRACEPOINT")) {
 			int len, ret, prog_fd, group_fd, pid, cpu;
 			char *tpname, *category;
