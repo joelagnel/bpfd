@@ -1,3 +1,7 @@
+- get a parser infra written for tools to add remotes and debug options
+- get it to use arm64 ptregs to access args correctly
+- get it to use arm64 kernel build tree and custom tree paths
+
 To get stackcount working:
     why doesn't it finish in bounded time?
 
