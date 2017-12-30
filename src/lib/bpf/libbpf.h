@@ -24,50 +24,81 @@
 extern "C" {
 #endif
 
+typedef int (*bpf_create_map_cb_t)(void *cb_cookie, void *data);
+struct bpf_create_map_args {
+	unsigned int type;
+	char *name;
+	unsigned int key_size;
+	unsigned int value_size;
+	unsigned int max_entries;
+	unsigned int map_flags;
+};
+
+extern bpf_create_map_cb_t bpf_create_map_cb;
+extern void * bpf_create_map_cookie;
+
 enum bpf_probe_attach_type {
 	BPF_PROBE_ENTRY,
 	BPF_PROBE_RETURN
 };
 
-int bpf_create_map(enum bpf_map_type map_type, int key_size, int value_size,
-		   int max_entries, int map_flags);
+int bpf_create_map(enum bpf_map_type map_type, const char *name,
+                   int key_size, int value_size, int max_entries,
+                   int map_flags);
 int bpf_update_elem(int fd, void *key, void *value, unsigned long long flags);
 int bpf_lookup_elem(int fd, void *key, void *value);
 int bpf_delete_elem(int fd, void *key);
 int bpf_get_first_key(int fd, void *key, size_t key_size);
 int bpf_get_next_key(int fd, void *key, void *next_key);
 
-int bpf_prog_load(enum bpf_prog_type prog_type,
-		  const struct bpf_insn *insns, int insn_len,
-		  const char *license, unsigned kern_version,
-		  char *log_buf, unsigned log_buf_size);
+/*
+ * Load a BPF program, and return the FD of the loaded program.
+ *
+ * On newer Kernels, the parameter name is used to identify the loaded program
+ * for inspection and debugging. It could be different from the function name.
+ *
+ * If log_level has value greater than 0, or the load failed, it will enable
+ * extra logging of loaded BPF bytecode and register status, and will print the
+ * logging message to stderr. In such cases:
+ *   - If log_buf and log_buf_size are provided, it will use and also write the
+ *     log messages to the provided log_buf. If log_buf is insufficient in size,
+ *     it will not to any additional memory allocation.
+ *   - Otherwise, it will allocate an internal temporary buffer for log message
+ *     printing, and continue to attempt increase that allocated buffer size if
+ *     initial attemp was insufficient in size.
+ */
+int bpf_prog_load(enum bpf_prog_type prog_type, const char *name,
+                  const struct bpf_insn *insns, int insn_len,
+                  const char *license, unsigned kern_version,
+                  int log_level, char *log_buf, unsigned log_buf_size);
+
 int bpf_attach_socket(int sockfd, int progfd);
 
-/* create RAW socket and bind to interface 'name' */
+/* create RAW socket. If name is not NULL/a non-empty null-terminated string,
+ * bind the raw socket to the interface 'name' */
 int bpf_open_raw_sock(const char *name);
 
 typedef void (*perf_reader_cb)(void *cb_cookie, int pid, uint64_t callchain_num,
                                void *callchain);
 typedef void (*perf_reader_raw_cb)(void *cb_cookie, void *raw, int raw_size);
-typedef void (*perf_reader_lost_cb)(uint64_t lost);
+typedef void (*perf_reader_lost_cb)(void *cb_cookie, uint64_t lost);
 
-void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
+void *bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
                         const char *ev_name, const char *fn_name,
-                        pid_t pid, int cpu, int group_fd,
                         perf_reader_cb cb, void *cb_cookie);
 
 int bpf_detach_kprobe(const char *ev_name);
 
-void * bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type,
-                        const char *ev_name, const char *binary_path, uint64_t offset,
-                        pid_t pid, int cpu, int group_fd,
-                        perf_reader_cb cb, void *cb_cookie);
+void *bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type,
+                        const char *ev_name, const char *binary_path,
+                        uint64_t offset, pid_t pid, perf_reader_cb cb,
+                        void *cb_cookie);
 
 int bpf_detach_uprobe(const char *ev_name);
 
-void * bpf_attach_tracepoint(int progfd, const char *tp_category,
-                             const char *tp_name, int pid, int cpu,
-                             int group_fd, perf_reader_cb cb, void *cb_cookie);
+void *bpf_attach_tracepoint(int progfd, const char *tp_category,
+                            const char *tp_name, perf_reader_cb cb,
+                            void *cb_cookie);
 int bpf_detach_tracepoint(const char *tp_category, const char *tp_name);
 
 void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb,
@@ -89,10 +120,13 @@ int bpf_close_perf_event_fd(int fd);
 
 int bpf_obj_pin(int fd, const char *pathname);
 int bpf_obj_get(const char *pathname);
-int bpf_obj_get_info(int prog_map_fd, void *info, int *info_len);
+int bpf_obj_get_info(int prog_map_fd, void *info, uint32_t *info_len);
 int bpf_prog_compute_tag(const struct bpf_insn *insns, int prog_len,
                          unsigned long long *tag);
 int bpf_prog_get_tag(int fd, unsigned long long *tag);
+int bpf_prog_get_next_id(uint32_t start_id, uint32_t *next_id);
+int bpf_prog_get_fd_by_id(uint32_t id);
+int bpf_map_get_fd_by_id(uint32_t id);
 
 #define LOG_BUF_SIZE 65536
 

@@ -70,7 +70,7 @@ void remote_raw_reader_cb(void *cookie, void *raw, int size)
 	free(raw_str);
 }
 
-void remote_lost_reader_cb(uint64_t lost)
+void remote_lost_reader_cb(void *ptr, uint64_t lost)
 {
 }
 

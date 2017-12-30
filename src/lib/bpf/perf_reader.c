@@ -243,9 +243,17 @@ void perf_reader_event_read(struct perf_reader *reader) {
     }
 
     if (e->type == PERF_RECORD_LOST) {
-      uint64_t lost = *(uint64_t *)(ptr + sizeof(*e));
+      /*
+       * struct {
+       *    struct perf_event_header    header;
+       *    u64                id;
+       *    u64                lost;
+       *    struct sample_id        sample_id;
+       * };
+       */
+      uint64_t lost = *(uint64_t *)(ptr + sizeof(*e) + sizeof(uint64_t));
       if (reader->lost_cb) {
-        reader->lost_cb(lost);
+        reader->lost_cb(reader->cb_cookie, lost);
       } else {
         fprintf(stderr, "Possibly lost %" PRIu64 " samples\n", lost);
       }
@@ -266,7 +274,10 @@ int perf_reader_poll(int num_readers, struct perf_reader **readers, int timeout)
   struct pollfd pfds[num_readers];
   int i;
 
+  memset(pfds, num_readers * sizeof(struct pollfd), 0);
   for (i = 0; i <num_readers; ++i) {
+	if (!readers[i])
+		continue;
     pfds[i].fd = readers[i]->fd;
     pfds[i].events = POLLIN;
   }

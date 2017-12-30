@@ -35,12 +35,12 @@
 /* Command format: BPF_PROG_LOAD type prog_len license kern_version binary_data
  *
  * Prototype of lib call:
- int bpf_prog_load(enum bpf_prog_type prog_type,
+ int bpf_prog_load(enum bpf_prog_type prog_type, const char *name,
  const struct bpf_insn *insns, int prog_len,
  const char *license, unsigned kern_version,
  char *log_buf, unsigned log_buf_size)
  */
-int bpf_prog_load_handle(int type, char *bin_b64, int prog_len, char *license,
+int bpf_prog_load_handle(int type, char *name, char *bin_b64, int prog_len, char *license,
 		unsigned int kern_version)
 {
 	int bin_len, ret;
@@ -55,10 +55,12 @@ int bpf_prog_load_handle(int type, char *bin_b64, int prog_len, char *license,
 
 	insns = (const struct bpf_insn *)bin_buf;
 
-	ret = bpf_prog_load((enum bpf_prog_type)type, insns, prog_len,
-			(const char *)license, kern_version, NULL, 0);
+	/* TODO: logging disabled for now, add mechanism in future */
+	ret = bpf_prog_load((enum bpf_prog_type)type, name, insns, prog_len,
+			(const char *)license, kern_version, 0, NULL, 0);
 
 	printf("bpf_prog_load: ret=%d\n", ret);
+	return ret;
 }
 
 int get_trace_events(char *tracefs, char *category)
@@ -116,7 +118,6 @@ char *bpf_remote_lookup_elem(int map_fd, char *kstr, int klen, int llen)
 {
 	void *lbin, *kbin;
 	char *lstr, *rets = NULL;
-	int ret;
 
 	kbin = (void *)malloc(klen);
 	if (!kbin)
@@ -168,7 +169,6 @@ char *bpf_remote_get_next_key(int map_fd, char *kstr, int klen)
 {
 	void *kbin, *next_kbin;
 	char *next_kstr, *rets = NULL;
-	int ret;
 
 	kbin = (void *)malloc(klen);
 	if (!kbin)
@@ -219,7 +219,7 @@ int main(int argc, char **argv)
 {
 	char line_buf[LINEBUF_SIZE];
 	char *cmd, *lineptr, *argstr, *tok, *kvers_str = NULL;
-	int len, fd, c, kvers = -1;
+	int len, c, kvers = -1;
 
 	opterr = 0;
 	while ((c = getopt (argc, argv, "k:")) != -1)
@@ -246,7 +246,6 @@ int main(int argc, char **argv)
 	printf("STARTED_BPFD\n");
 
 	while (fgets(line_buf, LINEBUF_SIZE, stdin)) {
-		int fd;
 		line_buf[strcspn(line_buf, "\r\n")] = 0;
 		line_buf[strcspn(line_buf, "\n")] = 0;
 
@@ -314,7 +313,7 @@ int main(int argc, char **argv)
 		} else if (!strcmp(cmd, "BPF_PROG_LOAD")) {
 
 			int len, prog_len, type;
-			char *license, *bin_data;
+			char *license, *bin_data, *name;
 			unsigned int kern_version, kvdummy;
 			/*
 			 * Command format: BPF_PROG_LOAD type prog_len license kern_version binary_data
@@ -324,6 +323,7 @@ int main(int argc, char **argv)
 			 * const char *license, unsigned kern_version, char *log_buf, unsigned log_buf_size)
 			*/
 			PARSE_FIRST_INT(type);
+			PARSE_STR(name);
 			PARSE_INT(prog_len);
 			PARSE_STR(license);
 			if (kvers != -1) {
@@ -334,29 +334,23 @@ int main(int argc, char **argv)
 			}
 			PARSE_STR(bin_data);
 
-			bpf_prog_load_handle(type, bin_data, prog_len, license, kern_version);
+			if (!strcmp(name, "__none__"))
+				name = NULL;
+			bpf_prog_load_handle(type, name, bin_data, prog_len, license, kern_version);
 
 		} else if (!strcmp(cmd, "BPF_ATTACH_KPROBE")) {
-			int len, ret, prog_fd, group_fd, pid, cpu, type;
+			int len, ret, prog_fd, type;
 			char *ev_name, *fn_name;
-			/*
-			 * void * bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type, const char *ev_name,
-			 *							const char *fn_name, pid_t pid, int cpu, int group_fd,
-			 *							perf_reader_cb cb, void *cb_cookie)
-			 */
 
 			PARSE_FIRST_INT(prog_fd);
 			PARSE_INT(type);
 			PARSE_STR(ev_name);
 			PARSE_STR(fn_name);
-			PARSE_INT(pid);
-			PARSE_INT(cpu);
-			PARSE_INT(group_fd);
 
 			/*
 			 * TODO: We're leaking a struct perf_reader here, we should free it somewhere.
 			 */
-			if (!bpf_attach_kprobe(prog_fd, type, ev_name, fn_name, pid, cpu, group_fd, NULL, NULL))
+			if (!bpf_attach_kprobe(prog_fd, type, ev_name, fn_name, NULL, NULL))
 				ret = -1;
 			else
 				ret = prog_fd;
@@ -372,25 +366,21 @@ int main(int argc, char **argv)
 			printf("bpf_detach_kprobe: ret=%d\n", ret);
 
 		} else if (!strcmp(cmd, "BPF_ATTACH_TRACEPOINT")) {
-			int len, ret, prog_fd, group_fd, pid, cpu;
+			int len, ret, prog_fd;
 			char *tpname, *category;
 			/*
 			 * void * bpf_attach_tracepoint(int progfd, const char *tp_category,
-			 *		const char *tp_name, int pid, int cpu,
-			 *		int group_fd, perf_reader_cb cb, void *cb_cookie)
+			 *		const char *tp_name, perf_reader_cb cb, void *cb_cookie)
 			 */
 
 			PARSE_FIRST_INT(prog_fd);
 			PARSE_STR(category);
 			PARSE_STR(tpname);
-			PARSE_INT(pid);
-			PARSE_INT(cpu);
-			PARSE_INT(group_fd);
 
 			/*
 			 * TODO: We're leaking a struct perf_reader here, we should free it somewhere.
 			 */
-			if (!bpf_attach_tracepoint(prog_fd, category, tpname, pid, cpu, group_fd, NULL, NULL))
+			if (!bpf_attach_tracepoint(prog_fd, category, tpname, NULL, NULL))
 				ret = -1;
 			else
 				ret = prog_fd;
@@ -399,20 +389,24 @@ int main(int argc, char **argv)
 
 		} else if (!strcmp(cmd, "BPF_CREATE_MAP")) {
 			/*
-			 * Command format: BPF_CREATE_MAP map_type, table.key_size, table.leaf_size, table.max_entries, table.flags);
-			 * Prototype of lib call:
-			 * int bpf_create_map(enum bpf_map_type map_type, int key_size, int value_size, int max_entries, int map_flags)
+				int bpf_create_map(enum bpf_map_type map_type, const char *name,
+                   int key_size, int value_size, int max_entries,
+                   int map_flags);
 			 */
 
 			int ret, type, len, key_size, value_size, max_entries, map_flags;
+			char *name;
 
 			PARSE_FIRST_INT(type);
+			PARSE_STR(name);
 			PARSE_INT(key_size);
 			PARSE_INT(value_size);
 			PARSE_INT(max_entries);
 			PARSE_INT(map_flags);
 
-			ret = bpf_create_map((enum bpf_map_type)type, key_size, value_size, max_entries, map_flags);
+			if (!strcmp(name, "__none__"))
+				name = NULL;
+			ret = bpf_create_map((enum bpf_map_type)type, name, key_size, value_size, max_entries, map_flags);
 			printf("bpf_create_map: ret=%d\n", ret);
 
 		} else if (!strcmp(cmd, "BPF_OPEN_PERF_BUFFER")) {
