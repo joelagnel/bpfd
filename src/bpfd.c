@@ -215,6 +215,52 @@ err_update:
 	return ret;
 }
 
+/*
+ * Clear a map by iterating over keys.
+ * Return delete error code if any deletes or allocs fail
+ * else return how many keys were iterated and deleted.
+ */
+int bpf_clear_map(int map_fd, int klen)
+{
+	void *kbin, *next_kbin, *tmp;
+	int count = 0, ret = -ENOMEM;
+
+	kbin = (void *)malloc(klen);
+	if (!kbin)
+		goto err_clear;
+
+	if (bpf_get_first_key(map_fd, kbin, klen) < 0) {
+		ret = 0;
+		goto err_clear;
+	}
+
+	do {
+		next_kbin = (void *)malloc(klen);
+		if (!next_kbin) {
+			ret = -ENOMEM;
+			goto err_clear;
+		}
+
+		ret = bpf_delete_elem(map_fd, kbin);
+		if (ret < 0)
+			goto err_clear;
+		count++;
+
+		ret = bpf_get_next_key(map_fd, kbin, next_kbin);
+
+		tmp = kbin;
+		kbin = next_kbin;
+		next_kbin = NULL;
+		free(tmp);
+	} while (ret >= 0);
+
+	ret = count;
+err_clear:
+	if (kbin) free(kbin);
+	if (next_kbin) free(next_kbin);
+	return ret;
+}
+
 int main(int argc, char **argv)
 {
 	char line_buf[LINEBUF_SIZE];
@@ -483,14 +529,21 @@ int main(int argc, char **argv)
 			int map_fd, klen, ret;
 			char *tok, *kstr;
 
-			printf("entered del elem\n");
-
 			PARSE_FIRST_INT(map_fd);
 			PARSE_STR(kstr);
 			PARSE_INT(klen);
 
 			ret = bpf_remote_delete_elem(map_fd, kstr, klen);
 			printf("bpf_delete_elem: ret=%d\n", ret);
+
+		} else if (!strcmp(cmd, "BPF_CLEAR_MAP")) {
+			int map_fd, klen, ret;
+
+			PARSE_FIRST_INT(map_fd);
+			PARSE_INT(klen);
+
+			ret = bpf_clear_map(map_fd, klen);
+			printf("bpf_clear_map: ret=%d\n", ret);
 
 		} else if (!strcmp(cmd, "PERF_READER_POLL")) {
 			int len, *fds, i, timeout, ret;
