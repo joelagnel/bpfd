@@ -377,6 +377,9 @@ int main(int argc, char **argv)
 		/* Command parsing logic */
 		cmd = strtok(lineptr, " ");
 
+		if (!cmd)
+			break;
+
 		/* No "command args" format found */
 		if (strlen(cmd) == len)
 			cmd = NULL;
