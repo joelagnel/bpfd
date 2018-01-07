@@ -30,3 +30,7 @@ build/bpfd: $(BPFD_SRCS) build/libbpf_bpfd.so
 
 clean:
 	rm -rf build
+
+install: build/bpfd build/libbpf_bpfd.so
+	cp build/bpfd /usr/bin/
+	cp build/libbpf_bpfd.so /usr/lib/
