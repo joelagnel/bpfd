@@ -291,7 +291,7 @@ err_update:
  */
 int bpf_clear_map(int map_fd, int klen)
 {
-	void *kbin, *next_kbin, *tmp;
+	void *kbin, *next_kbin = NULL, *tmp = NULL;
 	int count = 0, ret = -ENOMEM;
 
 	kbin = (void *)malloc(klen);
