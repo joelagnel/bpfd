@@ -146,7 +146,7 @@ err_update:
 
 char *bpf_remote_get_first_key_dump_all(int map_fd, int klen, int llen)
 {
-	void *kbin, *lbin, *next_kbin, *tmp;
+	void *kbin, *lbin, *next_kbin = NULL, *tmp;
 	int ret, dump_buf_len = 4096, dump_used = 1;
 	char *dump_buf, *kstr, *lstr, *rets = NULL;
 
