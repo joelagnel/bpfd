@@ -49,30 +49,17 @@ int cat_file(char *path) {
 
 /* Read a tracefs file to stdout */
 int cat_tracefs_file(char *tracefs, char *fn) {
-/*	char tracef[100];*/
-
-/*	tracef[0] = 0;*/
-/*	strcat(tracef, tracefs);*/
-/*	strcat(tracef, "/");*/
-/*	strcat(tracef, fn);*/
-
 	char * tracef;
-	size_t len_tfs, len_fn;
+	size_t length;
 	int    return_val;
 	
-	len_tfs = strlen(tracefs);
-	len_fn  = strlen(fn);
+	length = strlen(tracefs) + 1 + strlen(fn) + 1;
+	tracef = malloc(length);
 	
-	/* 1 for the '\0', and one for the '/' */
-	tracef = malloc(len_tfs+len_fn+2);
-	
-	/* I opted to use memcpy instead of strcat because I only wanted to
-	itterate each string once. */
-	memcpy(tracef, tracefs, len_tfs);
-	memcpy(tracef+len_tfs+1, fn, len_fn);
-	
-	tracef[len_tfs] = '/';
-	tracef[len_tfs+len_fn+1] = '\0';
+	tracef[0] = 0;
+	strcat(tracef, tracefs);
+	strcat(tracef, "/");
+	strcat(tracef, fn);
 	
 	return_val = cat_file(tracef);
 	free(tracef);
