@@ -1,1 +1,2 @@
+export PS1="(bcc) \u@\h:\w\$ "
 alias bcc-set='source bcc-env '

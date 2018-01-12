@@ -1,4 +1,6 @@
 #!/bin/bash
+# When modifying the env, this script should be sourced.
+# For example, source bcc-env --arch arm64
 
 function printhelp() {
     echo "Usage: bcc-env --kernelsrc,-k     Set the full path to kernel sources"
@@ -8,13 +10,13 @@ function printhelp() {
     echo "               --debug,-d         Enable BCC and remote debug"
     echo "               --nodebug,-n       Disable BCC and remote debug"
     echo "               --help,-h          Print this message"
-    exit 3
+    return 3
 }
 
 getopt --test > /dev/null
 if [[ $? -ne 4 ]]; then
     echo "I’m sorry, `getopt --test` failed in this environment."
-    exit 1
+    return 1
 fi
 
 OPTIONS=k:a:r:phdn
@@ -28,12 +30,14 @@ if [[ $? -ne 0 ]]; then
     # e.g. $? == 1
     #  then getopt has complained about wrong arguments to stdout
     printhelp
+    return 5
 fi
 # read getopt’s output this way to handle the quoting right:
 eval set -- "$PARSED"
 
 if [[ $# -lt 2 ]]; then
     printhelp
+    return 6
 fi
 
 # now enjoy the options in order and nicely split until we see --
@@ -41,6 +45,7 @@ while true; do
     case "$1" in
         -h|--help)
             printhelp
+	    return 7
             shift
             ;;
         -k|--kernelsrc)
@@ -75,7 +80,7 @@ while true; do
             ;;
         *)
             echo "Programming error"
-            exit 2
+            return 2
             ;;
     esac
 done
@@ -83,6 +88,7 @@ done
 # handle non-option arguments
 if [[ $# -ne 0 ]]; then
     printhelp
+    return 8
 fi
 
 # echo "kernelsrc: $kernel_source_path, printall:$printall"
