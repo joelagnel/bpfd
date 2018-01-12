@@ -33,4 +33,5 @@ clean:
 
 install: build/bpfd build/libbpf_bpfd.so
 	cp build/bpfd /usr/bin/
+	cp src/setup-scripts/bcc-env /usr/bin/
 	cp build/libbpf_bpfd.so /usr/lib/

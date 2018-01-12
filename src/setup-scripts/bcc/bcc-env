@@ -1,0 +1,89 @@
+#!/bin/bash
+
+function printhelp() {
+    echo "Usage: bcc-env --kernelsrc,-k     Set the full path to kernel sources"
+    echo "               --arch,-a          Set the target architecture (ex: x86, arm64 etc)"
+    echo "               --remote,-r        Set the BCC remote communication method (ex: adb)"
+    echo "               --print,-p         Print all BCC env settings"
+    echo "               --debug,-d         Enable BCC and remote debug"
+    echo "               --nodebug,-n       Disable BCC and remote debug"
+    echo "               --help,-h          Print this message"
+    exit 3
+}
+
+getopt --test > /dev/null
+if [[ $? -ne 4 ]]; then
+    echo "I’m sorry, `getopt --test` failed in this environment."
+    exit 1
+fi
+
+OPTIONS=k:a:r:phdn
+LONGOPTIONS=kernelsrc:,print,help,debug,nodebug
+
+# -temporarily store output to be able to check for errors
+# -e.g. use “--options” parameter by name to activate quoting/enhanced mode
+# -pass arguments only via   -- "$@"   to separate them correctly
+PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTIONS --name "$0" -- "$@")
+if [[ $? -ne 0 ]]; then
+    # e.g. $? == 1
+    #  then getopt has complained about wrong arguments to stdout
+    printhelp
+fi
+# read getopt’s output this way to handle the quoting right:
+eval set -- "$PARSED"
+
+if [[ $# -lt 2 ]]; then
+    printhelp
+fi
+
+# now enjoy the options in order and nicely split until we see --
+while true; do
+    case "$1" in
+        -h|--help)
+            printhelp
+            shift
+            ;;
+        -k|--kernelsrc)
+            export BCC_KERNEL_SOURCE="$2"
+            shift 2
+            ;;
+        -r|--remote)
+            export BCC_REMOTE="$2"
+            shift 2
+            ;;
+        -a|--arch)
+            export ARCH="$2"
+            shift 2
+            ;;
+        -p|--print)
+            export|egrep "(BCC|ARCH=)"
+            shift
+            ;;
+        -d|--debug)
+            export BCC_REMOTE_DEBUG=1
+            export BCC_KBUILD_DEBUG=1
+            shift
+            ;;
+        -n|--nodebug)
+            unset BCC_REMOTE_DEBUG
+            unset BCC_KBUILD_DEBUG
+            shift
+            ;;
+        --)
+            shift
+            break
+            ;;
+        *)
+            echo "Programming error"
+            exit 2
+            ;;
+    esac
+done
+
+# handle non-option arguments
+if [[ $# -ne 0 ]]; then
+    printhelp
+fi
+
+# echo "kernelsrc: $kernel_source_path, printall:$printall"
+
