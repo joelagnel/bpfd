@@ -10,4 +10,4 @@ export PATH=/usr/local/bpfd-install/bin/:/usr/local/bpfd-install/share/bcc/tools
 export LD_LIBRARY_PATH=/usr/local/bpfd-install/lib/
 export PS1="(bcc) \u@\h:\w\$ "
 
-/bin/sh
+/bin/bash --norc
