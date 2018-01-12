@@ -1,0 +1,13 @@
+#!/bin/sh
+# An init script to initialize BCC environment to run tools
+
+echo "Setting up BCC tools environment"
+echo "Adding to \$PATH: /usr/local/bpfd-install/bin/:/usr/local/bpfd-install/share/bcc/tools/"
+echo "Setting to \$LD_LIBRARY_PATH: /usr/local/bpfd-install/lib/"
+echo "CTRL-D to exit the sandbox, enjoy!"
+
+export PATH=/usr/local/bpfd-install/bin/:/usr/local/bpfd-install/share/bcc/tools/:$PATH
+export LD_LIBRARY_PATH=/usr/local/bpfd-install/lib/
+export PS1="(bcc) \u@\h:\w\$ "
+
+/bin/sh
