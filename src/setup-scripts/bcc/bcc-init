@@ -8,6 +8,7 @@ echo "CTRL-D to exit the sandbox, enjoy!"
 
 export PATH=/usr/local/bpfd-install/bin/:/usr/local/bpfd-install/share/bcc/tools/:$PATH
 export LD_LIBRARY_PATH=/usr/local/bpfd-install/lib/
+export PYTHONPATH=/usr/local/bpfd-install/lib/python2.7/dist-packages/
 export PS1="(bcc) \u@\h:\w\$ "
 
 /bin/bash --rcfile /usr/local/bpfd-install/share/bcc.bash.rc
