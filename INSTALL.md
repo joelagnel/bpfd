@@ -1,4 +1,4 @@
-## Installing and running BCC tools and BPFd on Ubuntu 64-bit x86
+# Installing and running BCC tools and BPFd on Ubuntu 64-bit x86
 
 If you only care about running/adding/modifying new BCC tools and don't care about changing the core infrastructure of
 BCC/clang/BPFd code, [download the `bpfd-full-dl.deb`](http://bit.do/bpfd-full-dl). This package contains BCC tools, LLVM
@@ -62,7 +62,7 @@ To stop debugging, run:
 bcc-set --nodebug
 ```
 
-## Build and running everything yourself
+# (Alternately, IF you want to) Build and running everything yourself
 This is an example of a typical build and installation procedure, it should be fairly straight forward to get these steps
 working for other remotes or architectures. For this example, we'll refer to the machine where you do all your
 development and have your kernel sources available as the `development machine` and the machine you're tracing as the
@@ -79,9 +79,9 @@ make
 make install
 export PATH=$PWD/install/bin:$PATH
 ```
-LLVM's libraries are needed to run BCC tools. Add the last line above to your .bashrc to keep it persistent.
+LLVM's libraries are needed to run BCC tools. Add the last line above to your `.bashrc` to keep it persistent.
 
-### Build BCC tools on your development host
+#### Build BCC tools on your development host
 These steps were executed on Ubuntu distro. If they don't work for your distro, [check BCC project's
 INSTALL.md](https://github.com/iovisor/bcc/blob/master/INSTALL.md) for other instructions.
 ```
@@ -98,7 +98,7 @@ make install
 Admittedly, the build process for BPFd is quite simple and naive. Patches for a more configurable build/install process
 are welcome.
 
-[Clone and build the BPFd sources](https://github.com/joelagnel/bpfd):
+Clone and build the BPFd sources:
 ```
 git clone git@github.com:joelagnel/bpfd.git; cd bpfd
 make
