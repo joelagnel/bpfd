@@ -569,19 +569,14 @@ int main(int argc, char **argv)
 			if (lstr) free(lstr);
 
 		} else if (!strcmp(cmd, "BPF_GET_FIRST_KEY")) {
-			int map_fd, klen, llen, dump_all;
+			int map_fd, klen, llen;
 			char *tok, *kstr;
 
 			PARSE_FIRST_INT(map_fd);
 			PARSE_INT(klen);
 			PARSE_INT(llen);
-			PARSE_INT(dump_all);
 
-			if (dump_all)
-				kstr = bpf_remote_get_first_key_dump_all(map_fd, klen, llen);
-			else
-				kstr = bpf_remote_get_first_key(map_fd, klen);
-
+			kstr = bpf_remote_get_first_key_dump_all(map_fd, klen, llen);
 			if (!kstr)
 				printf("bpf_get_first_key: ret=%d\n", -1);
 			else
