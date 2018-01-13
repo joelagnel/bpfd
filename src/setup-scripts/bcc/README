@@ -13,6 +13,8 @@ line options for setting them, and printing what's already set.
 bcc.bash.rc: This rc file is used by the sandbox (bcc-init) script to setup the
 bash prompt, and introduces a 'bcc-set' alias that sources bcc-env to make the
 setting of environment variables effetive in the current shell session.
+
+build-bpfd-full-package.sh: This script is used to build the bpfd-full.deb package.
 -------------------------------
 TODO:
 - Automated scripts to build packages, currently I build them manually.
