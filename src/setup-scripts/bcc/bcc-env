@@ -20,7 +20,7 @@ if [[ $? -ne 4 ]]; then
 fi
 
 OPTIONS=k:a:r:phdn
-LONGOPTIONS=kernelsrc:,print,help,debug,nodebug
+LONGOPTIONS=kernelsrc:,print,help,debug,nodebug,remote,arch
 
 # -temporarily store output to be able to check for errors
 # -e.g. use “--options” parameter by name to activate quoting/enhanced mode
