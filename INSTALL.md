@@ -1,12 +1,14 @@
-# Installing and running BCC tools and BPFd on Ubuntu 64-bit x86
+# Install and runn BCC tools and BPFd from packages.
 
 If you only care about running/adding/modifying new BCC tools and don't care about changing the core infrastructure of
-BCC/clang/BPFd code, [download the `bpfd-full-dl.deb`](http://bit.do/bpfd-full-dl). This package contains BCC tools, LLVM
-libraries and BPFd ready to go. All source code is available in Joel's github repositories.
+BCC/clang/BPFd code, download the [`bpfd-full.deb`](http://bit.do/bpfd-full-dl) file. This package contains BCC
+tools, LLVM libraries and BPFd ready to go. All source code for these binaries are available in Joel's github repositories.
+
+Note that the .deb package is only for Ubuntu 64-bit x86 machines.
 
 Once downloaded, run:
 ```
-dpkg -i bcc-full*.deb
+dpkg -i bcc-full.deb
 ```
 This will install all the binaries into an isolated `/usr/local/bpfd-install/` directory. With the exception being a
 `/usr/bin/bcc-init` required to start the BCC environment sandbox.
