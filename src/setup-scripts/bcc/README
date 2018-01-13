@@ -1,0 +1,18 @@
+The files in this directory are for easier packaging of bcc and bpfd for anyone to try this project on Ubuntu.
+
+Description of the setup scripts:
+
+deb.control: DEBIAN/control file I use for the packaging.
+
+bcc-init: Create the BCC sandbox, this is packaged and installed to /usr/bin/ by dpkg
+
+bcc-env: This tool is packaged, but can also be used independently. Its purpose
+is to make setting of BCC environment variables easier by providing command
+line options for setting them, and printing what's already set.
+
+bcc.bash.rc: This rc file is used by the sandbox (bcc-init) script to setup the
+bash prompt, and introduces a 'bcc-set' alias that sources bcc-env to make the
+setting of environment variables effetive in the current shell session.
+-------------------------------
+TODO:
+- Automated scripts to build packages, currently I build them manually.

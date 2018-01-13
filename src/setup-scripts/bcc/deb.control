@@ -1,0 +1,6 @@
+Package: bpfd-full
+Version: 0.2
+Maintainer: Joel Fernandes
+Architecture: amd64
+Depends: libelf1 (>= 0.158), bash
+Description: BPFd, BCC tools and LLVM binaries. Everything needed to run BCC tools empowered by BPFd.
