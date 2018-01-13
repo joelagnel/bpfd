@@ -148,6 +148,6 @@ export BCC_KBUILD_DEBUG=1
 ```
 To debug BCC remote communications with BPFd, run:
 ```
-export BCC_REMOTE__DEBUG=1
+export BCC_REMOTE_DEBUG=1
 ```
 
