@@ -1,4 +1,4 @@
-# Install and runn BCC tools and BPFd from packages.
+# Install and run BCC tools and BPFd from a package
 
 If you only care about running/adding/modifying new BCC tools and don't care about changing the core infrastructure of
 BCC/clang/BPFd code, download the [`bpfd-full.deb`](http://bit.do/bpfd-full-dl) file. This package contains BCC
