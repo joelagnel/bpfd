@@ -63,7 +63,12 @@ To stop debugging, run:
 ```
 bcc-set --nodebug
 ```
+#### Apply Kernel Patch to speed up stack traces
+A kernel patch is needed to speed-up StackMap look ups. Its been tested on x86 and arm64. Please
+[download it](https://raw.githubusercontent.com/joelagnel/bpfd/master/patches/kernel/0001-bpf-stackmap-Implement-bpf_get_next_key.patch)
+and rebuild your kernel.
 
+<a name="diy"></a>
 # (Alternately, IF you want to) Build and running everything yourself
 This is an example of a typical build and installation procedure, it should be fairly straight forward to get these steps
 working for other remotes or architectures. For this example, we'll refer to the machine where you do all your
@@ -120,6 +125,11 @@ arm64 devices, push bpfd to the data partition by running:
 adb push build/bpfd /data/
 ```
 
+#### Apply Kernel Patch to speed up stack traces
+A kernel patch is needed to speed-up StackMap look ups. Its been tested on x86 and arm64. Please
+[download it](https://raw.githubusercontent.com/joelagnel/bpfd/master/patches/kernel/0001-bpf-stackmap-Implement-bpf_get_next_key.patch)
+and rebuild your kernel.
+
 #### Prepare your kernel sources
 Make sure the kernel sources are available on your development machine somewhere, and that the kernel build has
 completed atleast once in the kernel source directory.
@@ -148,6 +158,6 @@ export BCC_KBUILD_DEBUG=1
 ```
 To debug BCC remote communications with BPFd, run:
 ```
-export BCC_REMOTE__DEBUG=1
+export BCC_REMOTE_DEBUG=1
 ```
 
