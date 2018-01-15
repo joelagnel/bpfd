@@ -8,6 +8,27 @@ through other maps and look ups have to be performed. In new usecases,
 its useful to be able to iterate over the stackmap independently.
 Implement bpf_get_next_key to make this possible.
 
+More details of use case:
+Currently iterating over stack maps is done like so, for example
+in BCC tools offcputime script:
+1. Obtain keys from the 'counts' hash map.
+2. Look up stackmap with each of the keys obtained from step 1.
+
+This makes the iteration of stackmap dependent on the counts map.
+In a new tool I'm working on called BPFd [1], it gives a huge speed
+up when I dump entire maps before transmitting them to BCC tools
+on a different machine [2]. This patch makes it possible to dump
+stackmaps independent of other maps.
+
+Tested on x86 and arm64 machines.
+
+[1] https://lkml.org/lkml/2017/12/29/137
+[2] https://github.com/joelagnel/bpfd/issues/8
+
+Cc: Alexei Starovoitov <ast@kernel.org>
+Cc: Daniel Borkmann <daniel@iogearbox.net>
+Cc: Brendan Gregg <bgregg@netflix.com>
+Cc: Brenden Blanco <bblanco@gmail.com>
 Signed-off-by: Joel Fernandes <joelaf@google.com>
 ---
  kernel/bpf/stackmap.c | 18 +++++++++++++++++-
