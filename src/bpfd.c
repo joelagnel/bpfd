@@ -31,6 +31,7 @@
 
 #define LINEBUF_SIZE  2000000
 #define LINE_TOKENS   10
+#define PATH_BUF_SZ   256
 
 /* Command format: BPF_PROG_LOAD type prog_len license kern_version binary_data
  *
@@ -67,6 +68,9 @@ int get_trace_events(char *tracefs, char *category)
 {
 	char tracef[256];
 
+	if(strlen(tracefs) + 8 + strlen(category) > PATH_BUF_SZ-1)
+		return -1;
+
 	tracef[0] = 0;
 	strcat(tracef, tracefs);
 	strcat(tracef, "/events/");
@@ -78,6 +82,9 @@ int get_trace_events(char *tracefs, char *category)
 int get_trace_events_categories(char *tracefs)
 {
 	char tracef[256];
+
+	if(strlen(tracefs) + 8 > PATH_BUF_SZ-1)
+		return -1;
 
 	tracef[0] = 0;
 	strcat(tracef, tracefs);

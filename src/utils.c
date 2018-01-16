@@ -27,8 +27,11 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#define PATH_BUF_SZ 100
+
 /* Read a file on the local fs to stdout */
-int cat_file(char *path) {
+int cat_file(char *path)
+{
 	char buf[4096];
 	int len, fd;
 
@@ -48,8 +51,13 @@ int cat_file(char *path) {
 }
 
 /* Read a tracefs file to stdout */
-int cat_tracefs_file(char *tracefs, char *fn) {
-	char tracef[100];
+int cat_tracefs_file(char *tracefs, char *fn)
+{
+	char tracef[PATH_BUF_SZ];
+
+	/* prevent overflow of tracef */
+	if(strlen(tracefs) + strlen(fn) > PATH_BUF_SZ-2)
+		return -1;
 
 	tracef[0] = 0;
 	strcat(tracef, tracefs);
