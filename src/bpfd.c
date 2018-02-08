@@ -483,6 +483,36 @@ int main(int argc, char **argv)
 			ret = bpf_detach_kprobe(evname);
 			printf("bpf_detach_kprobe: ret=%d\n", ret);
 
+		} else if (!strcmp(cmd, "BPF_ATTACH_UPROBE")) {
+			int len, ret, prog_fd, type, pid;
+			char *ev_name, *binary_path;
+			uint64_t offset;
+
+			PARSE_FIRST_INT(prog_fd);
+			PARSE_INT(type);
+			PARSE_STR(ev_name);
+			PARSE_STR(binary_path);
+			PARSE_UINT64(offset);
+			PARSE_INT(pid);
+
+			/*
+			 * TODO: We're leaking a struct perf_reader here, we should free it somewhere.
+			 */
+			if (!bpf_attach_uprobe(prog_fd, type, ev_name, binary_path, offset, pid, NULL, NULL))
+				ret = -1;
+			else
+				ret = prog_fd;
+
+			printf("bpf_attach_uprobe: ret=%d\n", ret);
+
+		} else if (!strcmp(cmd, "BPF_DETACH_UPROBE")) {
+			int len, ret;
+			char *evname;
+
+			PARSE_FIRST_STR(evname);
+			ret = bpf_detach_uprobe(evname);
+			printf("bpf_detach_uprobe: ret=%d\n", ret);
+
 		} else if (!strcmp(cmd, "BPF_ATTACH_TRACEPOINT")) {
 			int len, ret, prog_fd;
 			char *tpname, *category;

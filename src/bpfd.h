@@ -17,6 +17,8 @@
  * limitations under the License.
  */
 
+#include <inttypes.h>
+
 #include "utils.h"
 #include "lib/bpf/libbpf.h"
 #include "base64.h"
@@ -35,11 +37,18 @@
 	if (!sscanf(tok, "%u ", &var))		\
 		goto invalid_command;
 
+#define PARSE_UINT64(var)			\
+	tok = strtok(NULL, " ");		\
+	if (!tok)				\
+		goto invalid_command;		\
+	if (!sscanf(tok, "%"SCNu64" ", &var))	\
+		goto invalid_command;
+
 #define PARSE_ULL(var)				\
 	tok = strtok(NULL, " ");		\
 	if (!tok)				\
 		goto invalid_command;		\
-	if (!sscanf(tok, "%llu ", &var))		\
+	if (!sscanf(tok, "%llu ", &var))	\
 		goto invalid_command;
 
 #define PARSE_STR(var)				\
