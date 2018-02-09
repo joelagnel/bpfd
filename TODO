@@ -8,7 +8,7 @@ https://github.com/joelagnel/linux/tree/uprobes-4.4-wahoo
 
 and, used perf to create probes on a simple program.
 
-First crossbuild perf statically, checkout upstream kernel and run:
+First crossbuild perf statically, checkout upstream kernel and run the following in tools/perf/:
 CROSS_COMPILE=aarch64-linux-gnu- ARCH=arm64 LDFLAGS=-static make V=1
 
 Weird quirks with static building of perf:
