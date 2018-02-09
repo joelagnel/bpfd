@@ -1,19 +1,44 @@
-- get a parser infra written for tools to add remotes and debug options
-- get it to use arm64 ptregs to access args correctly
-- get it to use arm64 kernel build tree and custom tree paths
+Check the issue tracker for all issues.
 
-To get stackcount working:
-    why doesn't it finish in bounded time?
+BPFd uprobes support is a work in progress for ARM64 remotes
+------------------------------------------------------------
+To test basic uprobes support, I used a Pixel 2 device running
+4.4 kernel with patches backported for Uprobes support:
+https://github.com/joelagnel/linux/tree/uprobes-4.4-wahoo
 
-Get syscount work:
-    Already working, but make script read from /proc on target
+and, used perf to create probes on a simple program.
 
-Get filecount working:
-    Make delitem work
+First crossbuild perf statically, checkout upstream kernel and run:
+CROSS_COMPILE=aarch64-linux-gnu- ARCH=arm64 LDFLAGS=-static make V=1
 
-old:
-next:
-- build bpf .o from kernel samples (simplest one)
-- run loader on x86 and make it generate message (load prog)
-- cross-compile protobuf + custom bpf loader (based on test read/write) for arm64
-- copy messages + custom bpf loader to arm64 target, load and check if it works.
+Weird quirks with static building of perf:
+- First run has to be done non-statically and then with the LDFLAGS=-static
+  parameter for libdw_dwarfunwind to be enabled.
+
+- Even if lzma support isn't there, it causes linker to pass -llzma to linker
+  causing static builds to fail. For this I had to say V=1, and remove the
+  lzma param to the linker
+
+Test program:
+#include <stdio.h>
+
+void  __attribute__ ((noinline)) foo2() {
+        printf("foo2!\n");
+}
+
+void  __attribute__ ((noinline)) foo1() {
+        foo2();
+        printf("foo1\n");
+}
+
+void main() {
+        foo1();
+}
+
+Create a probe:
+./perf probe -x /data/test -a foo2
+Record:
+./perf record -e probe_test:foo2 -a sleep 2
+Report probe results:
+./perf script
+
