@@ -75,6 +75,11 @@ working for other remotes or architectures. For this example, we'll refer to the
 development and have your kernel sources available as the `development machine` and the machine you're tracing as the
 `target`.
 
+#### Install build dependencies
+```
+sudo apt-get install cmake libelf-dev bison flex iperf netperf
+```
+
 #### Build LLVM on your development host
 ```
 git clone http://llvm.org/git/llvm.git
@@ -99,6 +104,13 @@ mkdir -p build; cd build
 cmake -DCMAKE_INSTALL_PREFIX=/usr ..
 make
 make install
+```
+
+If you're planning on running BCC's unit tests (i.e. by using `make test`), you will also need to install pyroute2:
+```
+git clone https://github.com/svinota/pyroute2.git
+cd pyroute2
+sudo make install
 ```
 
 #### Build/Install BPFd for your target machine
