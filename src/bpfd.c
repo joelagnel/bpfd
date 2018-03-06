@@ -700,6 +700,50 @@ int main(int argc, char **argv)
 			printf("GET_KSYM_ADDR: ret=%d\n", ret);
 			if (!ret)
 				printf("%"PRIu64"\n", addr);
+		} else if (!strcmp(cmd, "GET_USYM_NAME")) {
+			int len, ret, pid, demangle;
+			uint64_t addr;
+			struct bcc_symbol sym;
+			const char *name;
+			void *usym_cache = NULL;
+
+			PARSE_FIRST_INT(pid);
+			PARSE_UINT64(addr);
+			PARSE_INT(demangle);
+
+			usym_cache = bcc_symcache_new(pid, NULL);
+
+			if (demangle)
+				ret = bcc_symcache_resolve(usym_cache, addr, &sym);
+			else
+				ret = bcc_symcache_resolve_no_demangle(usym_cache, addr, &sym);
+
+			printf("GET_USYM_NAME: ret=%d\n", ret);
+			if (!ret) {
+				if (demangle)
+					name = sym.demangle_name;
+				else
+					name = sym.name;
+				printf("%s;%"PRIu64";%s\n", name, sym.offset, sym.module);
+			}
+			bcc_symbol_free_demangle_name(&sym);
+		} else if (!strcmp(cmd, "GET_USYM_ADDR")) {
+			int len, ret, pid;
+			char *name;
+			char *module;
+			uint64_t addr;
+			void *usym_cache = NULL;
+
+			PARSE_FIRST_INT(pid);
+			PARSE_STR(name);
+			PARSE_STR(module);
+
+			usym_cache = bcc_symcache_new(pid, NULL);
+
+			ret = bcc_symcache_resolve_name(usym_cache, module, name, &addr);
+			printf("GET_USYM_ADDR: ret=%d\n", ret);
+			if (!ret)
+				printf("%"PRIu64"\n", addr);
 		} else {
 
 invalid_command:
