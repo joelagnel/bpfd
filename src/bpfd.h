@@ -20,8 +20,8 @@
 #include <inttypes.h>
 
 #include "utils.h"
-#include "lib/bpf/libbpf.h"
 #include "base64.h"
+#include "libbpf.h"
 
 #define PARSE_INT(var)				\
 	tok = strtok(NULL, " ");		\

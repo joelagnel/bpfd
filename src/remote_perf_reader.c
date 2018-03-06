@@ -32,7 +32,7 @@
 #include <sys/types.h>
 #include <linux/bpf.h>
 #include <arpa/inet.h>
-#include "lib/bpf/perf_reader.h"
+#include "perf_reader.h"
 #include "bpfd.h"
 
 #define MAX_READERS 1024
