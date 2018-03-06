@@ -128,7 +128,7 @@ To build for arm64:
 ```
 git clone git@github.com:joelagnel/bpfd.git; cd bpfd
 mkdir -p build; cd build
-cmake -DCMAKE_TOOLCHAIN_FILE=../toolchain-aarch64.cmake ..
+cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchain-aarch64.cmake ..
 make
 ```
 

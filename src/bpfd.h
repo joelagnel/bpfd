@@ -73,6 +73,11 @@
 	if (!sscanf(tok, "%u ", &var))	\
 		goto invalid_command;
 
+#define PARSE_FIRST_UINT64(var)		\
+	PARSE_FIRST_TOK					\
+	if (!sscanf(tok, "%"SCNu64" ", &var))	\
+		goto invalid_command;
+
 #define PARSE_FIRST_STR(var)		\
 	PARSE_FIRST_TOK					\
 	var = tok;
