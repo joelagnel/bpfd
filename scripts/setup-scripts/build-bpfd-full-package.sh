@@ -10,10 +10,10 @@ sudo cp $HOME/repo/bpfd/build/bpfd $HOME/repo/bpfd-full/usr/local/bpfd-install/b
 sudo cp $HOME/repo/bpfd/build/libbpf_bpfd.so $HOME/repo/bpfd-full/usr/local/bpfd-install/lib/
 sudo cp $HOME/repo/bpfd.arm64 $HOME/repo/bpfd-full/usr/local/bpfd-install/share/
 
-sudo cp $HOME/repo/bpfd/src/setup-scripts/bcc/bcc-init $HOME/repo/bpfd-full/usr/bin/
-sudo cp $HOME/repo/bpfd/src/setup-scripts/bcc/bcc-env $HOME/repo/bpfd-full/usr/local/bpfd-install/bin/
-sudo cp $HOME/repo/bpfd/src/setup-scripts/bcc/bcc.bash.rc $HOME/repo/bpfd-full/usr/local/bpfd-install/share/
-sudo cp $HOME/repo/bpfd/src/setup-scripts/bcc/deb.control $HOME/repo/bpfd-full/DEBIAN/control
+sudo cp $HOME/repo/bpfd/scripts/setup-scripts/bcc-init $HOME/repo/bpfd-full/usr/bin/
+sudo cp $HOME/repo/bpfd/scripts/setup-scripts/bcc-env $HOME/repo/bpfd-full/usr/local/bpfd-install/bin/
+sudo cp $HOME/repo/bpfd/scripts/setup-scripts/bcc.bash.rc $HOME/repo/bpfd-full/usr/local/bpfd-install/share/
+sudo cp $HOME/repo/bpfd/scripts/setup-scripts/deb.control $HOME/repo/bpfd-full/DEBIAN/control
 
 sudo chown -R root:root $HOME/repo/bpfd-full/
 sudo chmod 0755 $HOME/repo/bpfd-full/DEBIAN/control

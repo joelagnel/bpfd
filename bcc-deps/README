@@ -1,0 +1,14 @@
+About the 'bcc-deps/' directory
+--------------------------------
+
+The files in 'bcc-deps/' are source files from the BCC repository that
+BPFd makes use of.
+
+They are not to be modified, and the only changes allowed to be made on these
+files are when they are updated by their newer copies from the BCC repository.
+
+These files as they are currently were pulled from the following fork of the
+BCC repository at the following commit:
+
+Repo: https://github.com/joelagnel/bcc/
+Commit: cf07b81671039d82125ddf4a79a0c0a818073b1f

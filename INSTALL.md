@@ -153,7 +153,7 @@ The following environment variables need to be setup:
 - `BCC_REMOTE` should point to the remote mechanism such as `adb`.
 
 If you'd like to set the environment variables more easily, you can use the `bcc-set` and `bcc-env` tools. Simply copy
-both of them from the cloned BPFd sources in `src/setup-scripts/bcc/` to your dev machine's `bin` directory. Check the
+both of them from the cloned BPFd sources in `scripts/setup-scripts/` to your dev machine's `bin` directory. Check the
 above instructions on how to use `bcc-set`.
 
 You can also source the example .rc files from my BCC tree. Two example environment variable settings are provided for

@@ -1,7 +1,7 @@
 BPFD_SRCS       := src/bpfd.c src/base64.c src/utils.c src/remote_perf_reader.c
-LIBBPF_SRC      := src/lib/bpf/libbpf.c
-PERF_READER_SRC := src/lib/bpf/perf_reader.c
-INCLUDE := -I/home/joelaf/repo/linux-mainline/usr/include/ -I./src/lib/bpf/compat/
+LIBBPF_SRC      := bcc-deps/libbpf.c
+PERF_READER_SRC := bcc-deps/perf_reader.c
+INCLUDE := -I/home/joelaf/repo/linux-mainline/usr/include/ -I./bcc-deps/ -I./bcc-deps/compat/
 
 CFLAGS := $(INCLUDE) -L./build/
 # CC := aarch64-linux-gnu-gcc-4.9
@@ -33,5 +33,5 @@ clean:
 
 install: build/bpfd build/libbpf_bpfd.so
 	cp build/bpfd /usr/bin/
-	cp src/setup-scripts/bcc/bcc-env /usr/bin/
+	cp scripts/setup-scripts/bcc-env /usr/bin/
 	cp build/libbpf_bpfd.so /usr/lib/
