@@ -1,7 +1,9 @@
 BPFD_SRCS       := src/bpfd.c src/base64.c src/utils.c src/remote_perf_reader.c
 LIBBPF_SRC      := src/lib/bpf/libbpf.c
 PERF_READER_SRC := src/lib/bpf/perf_reader.c
-INCLUDE := -I/home/joelaf/repo/linux-mainline/usr/include/ -I./src/lib/bpf/compat/
+INCLUDE :=  -I./src/lib/bpf/compat/
+# Add to INCLUDE if host's kernel is too old to build with bpf calls
+# -I/home/joelaf/repo/linux-mainline/usr/include/
 
 CFLAGS := $(INCLUDE) -L./build/ -static
 CC := aarch64-linux-gnu-gcc-4.9
