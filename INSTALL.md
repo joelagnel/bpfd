@@ -120,16 +120,21 @@ are welcome.
 Clone and build the BPFd sources:
 ```
 git clone git@github.com:joelagnel/bpfd.git; cd bpfd
+mkdir -p build; cd build
+cmake ..
 make
 ```
 To build for arm64:
 ```
 git clone git@github.com:joelagnel/bpfd.git; cd bpfd
-cp Makefile.arm64 Makefile
+mkdir -p build; cd build
+cmake -DCMAKE_TOOLCHAIN_FILE=../toolchain-aarch64.cmake ..
 make
 ```
-The built binaries (`bpfd` and `libbpf_bpfd.so`) are available in the build directory. Incase of errors, check that the
-compiler paths in the Makefile are suitable for your distribution.
+
+The built binaries are available in the build directory.
+
+In case of errors when building for arm64, check that the path to the `aarch64-linux-gnu` toolchain in `toolchain-aarch64.cmake` is suitable for your distribution.
 
 Installation really depends on the remote target. For arm64, copy the `build/bpfd` to your bin/ directory. For Android
 arm64 devices, push bpfd to the data partition by running:
