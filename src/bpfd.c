@@ -28,6 +28,7 @@
 #include <arpa/inet.h>
 
 #include "bpfd.h"
+#include "bcc_syms.h"
 
 #define LINEBUF_SIZE  2000000
 #define LINE_TOKENS   10
@@ -335,6 +336,7 @@ int main(int argc, char **argv)
 	char line_buf[LINEBUF_SIZE];
 	char *cmd, *lineptr, *argstr, *tok, *kvers_str = NULL;
 	int len, c, kvers = -1;
+	void *ksym_cache = NULL;
 
 	opterr = 0;
 	while ((c = getopt (argc, argv, "k:")) != -1)
@@ -670,6 +672,34 @@ int main(int argc, char **argv)
 			ret = remote_perf_reader_poll(fds, len, timeout);
 			if (ret < 0)
 				printf("perf_reader_poll: ret=%d\n", ret);
+		} else if (!strcmp(cmd, "GET_KSYM_NAME")) {
+			int len, ret;
+			uint64_t addr;
+			struct bcc_symbol sym;
+
+			PARSE_FIRST_UINT64(addr);
+
+			if(!ksym_cache)
+				ksym_cache = bcc_symcache_new(-1, NULL);
+
+			ret = bcc_symcache_resolve_no_demangle(ksym_cache, addr, &sym);
+			printf("GET_KSYM_NAME: ret=%d\n", ret);
+			if (!ret)
+				printf("%s;%"PRIu64";%s\n", sym.name, sym.offset, sym.module);
+		} else if (!strcmp(cmd, "GET_KSYM_ADDR")) {
+			int len, ret;
+			char* name;
+			uint64_t addr;
+
+			PARSE_FIRST_STR(name);
+
+			if(!ksym_cache)
+				ksym_cache = bcc_symcache_new(-1, NULL);
+
+			ret = bcc_symcache_resolve_name(ksym_cache, NULL, name, &addr);
+			printf("GET_KSYM_ADDR: ret=%d\n", ret);
+			if (!ret)
+				printf("%"PRIu64"\n", addr);
 		} else {
 
 invalid_command:

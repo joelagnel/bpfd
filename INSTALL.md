@@ -75,12 +75,12 @@ working for other remotes or architectures. For this example, we'll refer to the
 development and have your kernel sources available as the `development machine` and the machine you're tracing as the
 `target`.
 
-#### Install build dependencies
+### Install build dependencies
 ```
-sudo apt-get install cmake libelf-dev bison flex iperf netperf
+sudo apt-get install cmake zlib-devel libelf-dev bison flex iperf netperf
 ```
 
-#### Build LLVM on your development host
+### Build LLVM on your development host
 ```
 git clone http://llvm.org/git/llvm.git
 cd llvm/tools; git clone http://llvm.org/git/clang.git
@@ -93,7 +93,7 @@ export PATH=$PWD/install/bin:$PATH
 ```
 LLVM's libraries are needed to run BCC tools. Add the last line above to your `.bashrc` to keep it persistent.
 
-#### Build BCC tools on your development host
+### Build BCC tools on your development host
 These steps were executed on Ubuntu distro. If they don't work for your distro, [check BCC project's
 INSTALL.md](https://github.com/iovisor/bcc/blob/master/INSTALL.md) for other instructions.
 ```
@@ -113,22 +113,57 @@ cd pyroute2
 sudo make install
 ```
 
-#### Build/Install BPFd for your target machine
-Admittedly, the build process for BPFd is quite simple and naive. Patches for a more configurable build/install process
-are welcome.
+### Build/Install BPFd for your target machine
+You must build BPFd differently depending on the architecture of the target machine.
 
-Clone and build the BPFd sources:
+#### To build BPFd for x86
 ```
 git clone git@github.com:joelagnel/bpfd.git; cd bpfd
 mkdir -p build; cd build
 cmake ..
 make
 ```
-To build for arm64:
+
+#### To build BPFd for arm64
+Here, we make use of the `aarch64-linux-gnu` toolchain, which you can install on Ubuntu via:
+```
+sudo apt-get install g++-aarch64-linux-gnu
+```
+
+The commands below were executed with the assumption that the `aarch64-linux-gnu` toolchain is located in the `/usr/` directory.
+Please make the appropriate changes in the commands below if that assumption does not hold true for you.
+
+You first need to build zlib for arm64:
+```
+git clone https://github.com/madler/zlib.git; cd zlib
+export CROSS_PREFIX=aarch64-linux-gnu-
+./configure --prefix=/usr/aarch64-linux-gnu/
+make
+sudo make install
+```
+
+You also need to build elfutils for arm64:
+```
+git clone git://sourceware.org/git/elfutils.git; cd elfutils
+autoreconf -i -f
+
+# Build elfutils for x86 first since we need an x86 copy of i386_gendis to build elfutils for arm64
+./configure --enable-maintainer-mode
+make
+cp ./libcpu/i386_gendis ~/
+
+# Build elfutils for arm64
+./configure --host=aarch64-linux-gnu --prefix=/usr/aarch64-linux-gnu/ --enable-maintainer-mode
+cp ~/i386_gendis ./libcpu/i386_gendis
+make
+sudo make install
+```
+
+Once all the dependencies are ready, you can then finally build BPFd for arm64:
 ```
 git clone git@github.com:joelagnel/bpfd.git; cd bpfd
 mkdir -p build; cd build
-cmake -DCMAKE_TOOLCHAIN_FILE=../toolchain-aarch64.cmake ..
+cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchain-aarch64.cmake ..
 make
 ```
 
@@ -136,22 +171,23 @@ The built binaries are available in the build directory.
 
 In case of errors when building for arm64, check that the path to the `aarch64-linux-gnu` toolchain in `toolchain-aarch64.cmake` is suitable for your distribution.
 
+#### Installation
 Installation really depends on the remote target. For arm64, copy the `build/bpfd` to your bin/ directory. For Android
 arm64 devices, push bpfd to the data partition by running:
 ```
 adb push build/bpfd /data/
 ```
 
-#### Apply Kernel Patch to speed up stack traces
+### Apply Kernel Patch to speed up stack traces
 A kernel patch is needed to speed-up StackMap look ups. Its been tested on x86 and arm64. Please
 [download it](https://raw.githubusercontent.com/joelagnel/bpfd/master/patches/kernel/0001-bpf-stackmap-Implement-bpf_get_next_key.patch)
 and rebuild your kernel.
 
-#### Prepare your kernel sources
+### Prepare your kernel sources
 Make sure the kernel sources are available on your development machine somewhere, and that the kernel build has
 completed atleast once in the kernel source directory.
 
-#### Setup environment variables and run tools
+### Setup environment variables and run tools
 The following environment variables need to be setup:
 - `ARCH` should point to the architecture of the `target` such as `x86` or `arm64`.
 - `BCC_KERNEL_SOURCE` should point to the kernel source directory.
@@ -177,4 +213,3 @@ To debug BCC remote communications with BPFd, run:
 ```
 export BCC_REMOTE_DEBUG=1
 ```
-
