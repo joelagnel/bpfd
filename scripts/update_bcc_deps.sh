@@ -17,8 +17,8 @@
 # limitations under the License.
 
 # This script pulls the most up-to-date version of the BCC source files
-# that BPFd depends on from the BCC fork at https://github.com/joelagnel/bcc
-# and from the branch 'bcc-bpfd'.
+# that BPFd depends on from the BCC fork at https://github.com/jcanseco/bcc
+# and from the branch 'upstream_submit'.
 
 # Usage: update_bcc_deps.sh
 
@@ -26,8 +26,8 @@ SCRIPT_DIR=$(cd $(dirname ${BASH_SOURCE[0]}) && pwd) # Gets the script's source 
 BPFD_DIR=$(cd $SCRIPT_DIR && git rev-parse --show-toplevel) # Gets the BPFd root directory no matter where the script is placed within the BPFd tree
 BCC_DEPS_DIR="${BPFD_DIR}/bcc-deps"
 
-BCC_REPO_URL="https://github.com/joelagnel/bcc"
-BRANCH="bcc-bpfd"
+BCC_REPO_URL="https://github.com/jcanseco/bcc"
+BRANCH="upstream_submit"
 BCC_SRC_DIR="src/cc"
 
 FILES=(
