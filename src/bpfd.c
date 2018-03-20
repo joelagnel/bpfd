@@ -33,14 +33,6 @@
 #define LINEBUF_SIZE  2000000
 #define LINE_TOKENS   10
 
-#define DEFAULT_MAX_PID  32768
-
-struct usym_cache {
-	int pid;
-	char *exe_path;
-	void *cache;
-};
-
 /* Command format: BPF_PROG_LOAD type prog_len license kern_version binary_data
  *
  * Prototype of lib call:
@@ -339,69 +331,12 @@ err_clear:
 	return ret;
 }
 
-char *get_pid_exe(int pid)
-{
-	const int PATHBUF_SIZE = 4096;
-
-	char *exe_path = (char *)malloc(PATHBUF_SIZE);
-	char exe_link[PATHBUF_SIZE];
-	int num_chars_read = 0;
-
-	snprintf(exe_link, PATHBUF_SIZE, "/proc/%d/exe", pid);
-	num_chars_read = readlink(exe_link, exe_path, PATHBUF_SIZE);
-	if (num_chars_read < 0)
-		num_chars_read = 0;
-	exe_path[num_chars_read] = '\0';
-	return exe_path;
-}
-
-struct usym_cache *get_or_set_usym_cache(int pid, struct usym_cache *usym_caches[])
-{
-	struct usym_cache *usym_cache = usym_caches[pid % DEFAULT_MAX_PID];
-
-	char *exe_path = get_pid_exe(pid);
-	if (!usym_cache || usym_cache->pid != pid || strcmp(usym_cache->exe_path, exe_path)) {
-		if (!usym_cache) {
-			usym_cache = (struct usym_cache *)malloc(sizeof(struct usym_cache));
-		} else {
-			free(usym_cache->exe_path);
-			bcc_free_symcache(usym_cache->cache, usym_cache->pid);
-		}
-
-		usym_cache->pid = pid;
-		usym_cache->exe_path = exe_path;
-		usym_cache->cache = bcc_symcache_new(pid, NULL);
-
-		usym_caches[pid % DEFAULT_MAX_PID] = usym_cache;
-	} else {
-		free(exe_path);
-	}
-
-	return usym_cache;
-}
-
-void free_usym_caches(struct usym_cache **usym_caches)
-{
-	int i;
-	for (i = 0; i < DEFAULT_MAX_PID; i++) {
-		if (usym_caches[i]) {
-			free(usym_caches[i]->exe_path);
-			bcc_free_symcache(usym_caches[i]->cache, usym_caches[i]->pid);
-
-			free(usym_caches[i]);
-		}
-	}
-
-	free(usym_caches);
-}
-
 int main(int argc, char **argv)
 {
 	char line_buf[LINEBUF_SIZE];
 	char *cmd, *lineptr, *argstr, *tok, *kvers_str = NULL;
 	int len, c, kvers = -1;
 	void *ksym_cache = NULL;
-	struct usym_cache **usym_caches = (struct usym_cache **)calloc(DEFAULT_MAX_PID, sizeof(struct usym_cache *));
 
 	opterr = 0;
 	while ((c = getopt (argc, argv, "k:")) != -1)
@@ -484,7 +419,7 @@ int main(int argc, char **argv)
 
 			if (get_trace_events_categories(argstr) < 0)
 				goto invalid_command;
-
+	
 		} else if (!strcmp(cmd, "GET_TRACE_EVENTS")) {
 			int len;
 			char *category, *tracefs;
@@ -535,11 +470,7 @@ int main(int argc, char **argv)
 			/*
 			 * TODO: We're leaking a struct perf_reader here, we should free it somewhere.
 			 */
-			if (!bpf_attach_kprobe(prog_fd, type, ev_name, fn_name, NULL, NULL))
-				ret = -1;
-			else
-				ret = prog_fd;
-
+			ret = bpf_attach_kprobe(prog_fd, type, ev_name, fn_name);
 			printf("bpf_attach_kprobe: ret=%d\n", ret);
 
 		} else if (!strcmp(cmd, "BPF_DETACH_KPROBE")) {
@@ -565,11 +496,7 @@ int main(int argc, char **argv)
 			/*
 			 * TODO: We're leaking a struct perf_reader here, we should free it somewhere.
 			 */
-			if (!bpf_attach_uprobe(prog_fd, type, ev_name, binary_path, offset, pid, NULL, NULL))
-				ret = -1;
-			else
-				ret = prog_fd;
-
+			ret = bpf_attach_uprobe(prog_fd, type, ev_name, binary_path, offset, pid);
 			printf("bpf_attach_uprobe: ret=%d\n", ret);
 
 		} else if (!strcmp(cmd, "BPF_DETACH_UPROBE")) {
@@ -595,11 +522,7 @@ int main(int argc, char **argv)
 			/*
 			 * TODO: We're leaking a struct perf_reader here, we should free it somewhere.
 			 */
-			if (!bpf_attach_tracepoint(prog_fd, category, tpname, NULL, NULL))
-				ret = -1;
-			else
-				ret = prog_fd;
-
+			ret = bpf_attach_tracepoint(prog_fd, category, tpname);
 			printf("bpf_attach_tracepoint: ret=%d\n", ret);
 
 		} else if (!strcmp(cmd, "BPF_CREATE_MAP")) {
@@ -765,50 +688,6 @@ int main(int argc, char **argv)
 			printf("GET_KSYM_ADDR: ret=%d\n", ret);
 			if (!ret)
 				printf("%"PRIu64"\n", addr);
-		} else if (!strcmp(cmd, "GET_USYM_NAME")) {
-			int len, ret, pid, demangle;
-			uint64_t addr;
-			struct bcc_symbol sym;
-			const char *name;
-			struct usym_cache *usym_cache = NULL;
-
-			PARSE_FIRST_INT(pid);
-			PARSE_UINT64(addr);
-			PARSE_INT(demangle);
-
-			usym_cache = get_or_set_usym_cache(pid, usym_caches);
-
-			if (demangle)
-				ret = bcc_symcache_resolve(usym_cache->cache, addr, &sym);
-			else
-				ret = bcc_symcache_resolve_no_demangle(usym_cache->cache, addr, &sym);
-
-			printf("GET_USYM_NAME: ret=%d\n", ret);
-			if (!ret) {
-				if (demangle)
-					name = sym.demangle_name;
-				else
-					name = sym.name;
-				printf("%s;%"PRIu64";%s\n", name, sym.offset, sym.module);
-			}
-			bcc_symbol_free_demangle_name(&sym);
-		} else if (!strcmp(cmd, "GET_USYM_ADDR")) {
-			int len, ret, pid;
-			char *name;
-			char *module;
-			uint64_t addr;
-			struct usym_cache *usym_cache = NULL;
-
-			PARSE_FIRST_INT(pid);
-			PARSE_STR(name);
-			PARSE_STR(module);
-
-			usym_cache = get_or_set_usym_cache(pid, usym_caches);
-
-			ret = bcc_symcache_resolve_name(usym_cache->cache, module, name, &addr);
-			printf("GET_USYM_ADDR: ret=%d\n", ret);
-			if (!ret)
-				printf("%"PRIu64"\n", addr);
 		} else {
 
 invalid_command:
@@ -818,6 +697,5 @@ invalid_command:
 		printf("END_BPFD_OUTPUT\n");
 		fflush(stdout);
 	}
-	free_usym_caches(usym_caches);
 	return 0;
 }
