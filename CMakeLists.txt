@@ -26,6 +26,7 @@ add_library(bpfd-bcc bcc-deps/bcc_elf.c bcc-deps/bcc_perf_map.c bcc-deps/bcc_pro
 			bcc-deps/vendor/tinyformat.hpp)
 target_link_libraries(bpfd-bcc ${LIBELF_LIBRARIES} ${ZLIB_LIBRARIES})
 
-add_executable(bpfd src/bpfd.c src/base64.c src/remote_perf_reader.c src/utils.c)
+add_executable(bpfd src/bpfd.c src/base64.c src/remote_perf_reader.c src/utils.c
+			src/cmd_parsers.c)
 target_link_libraries(bpfd bpfd-bpf)
 target_link_libraries(bpfd bpfd-bcc)

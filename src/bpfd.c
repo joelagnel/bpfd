@@ -26,12 +26,12 @@
 #include <sys/types.h>
 #include <linux/bpf.h>
 #include <arpa/inet.h>
+#include <inttypes.h>
 
 #include "bpfd.h"
 #include "bcc_syms.h"
 
 #define LINEBUF_SIZE  2000000
-#define LINE_TOKENS   10
 
 #define DEFAULT_MAX_PID  32768
 
@@ -397,9 +397,10 @@ void free_usym_caches(struct usym_cache **usym_caches)
 
 int main(int argc, char **argv)
 {
+	struct user_input *in = NULL;
 	char line_buf[LINEBUF_SIZE];
-	char *cmd, *lineptr, *argstr, *tok, *kvers_str = NULL;
-	int len, c, kvers = -1;
+	char *kvers_str = NULL;
+	int arg_index = 0, c, kvers = -1;
 	void *ksym_cache = NULL;
 	struct usym_cache **usym_caches = (struct usym_cache **)calloc(DEFAULT_MAX_PID, sizeof(struct usym_cache *));
 
@@ -428,78 +429,63 @@ int main(int argc, char **argv)
 	printf("STARTED_BPFD\n");
 
 	while (fgets(line_buf, LINEBUF_SIZE, stdin)) {
-		line_buf[strcspn(line_buf, "\r\n")] = 0;
-		line_buf[strcspn(line_buf, "\n")] = 0;
-
-		lineptr = line_buf;
-		len = strlen(lineptr);
+		line_buf[strcspn(line_buf, "\n")] = '\0';
 
 		/* Empty input */
-		if (!len)
+		if (!strlen(line_buf))
 			continue;
 
-		if (!strcmp(lineptr, "exit"))
+		in = parse_user_input(line_buf);
+		arg_index = 0;
+
+		if (!strcmp(in->cmd, "exit")) {
+			free_user_input(in);
+			in = NULL;
 			break;
-
-		/* Command parsing logic */
-		cmd = strtok(lineptr, " ");
-
-		if (!cmd)
-			break;
-
-		/* No "command args" format found */
-		if (strlen(cmd) == len)
-			cmd = NULL;
-
-		if (cmd) {
-			lineptr = line_buf;
-			while (*lineptr)
-				lineptr++;
-			lineptr++;
-
-			if (!*lineptr) {
-				cmd = NULL;
-			} else {
-				argstr = lineptr;
-			}
 		}
 
 		printf("START_BPFD_OUTPUT\n");
 		fflush(stdout);
 
-		if (!cmd)
-			goto invalid_command;
+		if (!strcmp(in->cmd, "GET_AVAIL_FILTER_FUNCS")) {
+			char *tracefs;
 
-		if (!strcmp(cmd, "GET_AVAIL_FILTER_FUNCS")) {
+			PARSE_STR(tracefs);
 
-			if (cat_tracefs_file(argstr, "available_filter_functions") < 0)
+			if (cat_tracefs_file(tracefs, "available_filter_functions") < 0)
 				goto invalid_command;
 
-		} else if (!strcmp(cmd, "GET_KPROBES_BLACKLIST")) {
+		} else if (!strcmp(in->cmd, "GET_KPROBES_BLACKLIST")) {
+			char *tracefs;
 
-			if (cat_tracefs_file(argstr, "../kprobes/blacklist") < 0)
+			PARSE_STR(tracefs);
+
+			if (cat_tracefs_file(tracefs, "../kprobes/blacklist") < 0)
 				goto invalid_command;
 
-		} else if (!strcmp(cmd, "GET_TRACE_EVENTS_CATEGORIES")) {
+		} else if (!strcmp(in->cmd, "GET_TRACE_EVENTS_CATEGORIES")) {
+			char *tracefs;
 
-			if (get_trace_events_categories(argstr) < 0)
+			PARSE_STR(tracefs);
+
+			if (get_trace_events_categories(tracefs) < 0)
 				goto invalid_command;
 
-		} else if (!strcmp(cmd, "GET_TRACE_EVENTS")) {
-			int len;
-			char *category, *tracefs;
+		} else if (!strcmp(in->cmd, "GET_TRACE_EVENTS")) {
+			char *tracefs, *category;
 
-			PARSE_FIRST_STR(tracefs);
+			PARSE_STR(tracefs);
 			PARSE_STR(category);
 
 			if (get_trace_events(tracefs, category) < 0)
 				goto invalid_command;
 
-		} else if (!strcmp(cmd, "BPF_PROG_LOAD")) {
+		} else if (!strcmp(in->cmd, "BPF_PROG_LOAD")) {
 
-			int len, prog_len, type;
+			int prog_len, type;
 			char *license, *bin_data, *name;
 			unsigned int kern_version, kvdummy;
+
 			/*
 			 * Command format: BPF_PROG_LOAD type prog_len license kern_version binary_data
 			 * Prototype of lib call:
@@ -507,7 +493,8 @@ int main(int argc, char **argv)
 			 * const struct bpf_insn *insns, int prog_len,
 			 * const char *license, unsigned kern_version, char *log_buf, unsigned log_buf_size)
 			*/
-			PARSE_FIRST_INT(type);
+
+			PARSE_INT(type);
 			PARSE_STR(name);
 			PARSE_INT(prog_len);
 			PARSE_STR(license);
@@ -523,11 +510,11 @@ int main(int argc, char **argv)
 				name = NULL;
 			bpf_prog_load_handle(type, name, bin_data, prog_len, license, kern_version);
 
-		} else if (!strcmp(cmd, "BPF_ATTACH_KPROBE")) {
-			int len, ret, prog_fd, type;
+		} else if (!strcmp(in->cmd, "BPF_ATTACH_KPROBE")) {
+			int ret, prog_fd, type;
 			char *ev_name, *fn_name;
 
-			PARSE_FIRST_INT(prog_fd);
+			PARSE_INT(prog_fd);
 			PARSE_INT(type);
 			PARSE_STR(ev_name);
 			PARSE_STR(fn_name);
@@ -542,20 +529,20 @@ int main(int argc, char **argv)
 
 			printf("bpf_attach_kprobe: ret=%d\n", ret);
 
-		} else if (!strcmp(cmd, "BPF_DETACH_KPROBE")) {
-			int len, ret;
+		} else if (!strcmp(in->cmd, "BPF_DETACH_KPROBE")) {
+			int ret;
 			char *evname;
 
-			PARSE_FIRST_STR(evname);
+			PARSE_STR(evname);
 			ret = bpf_detach_kprobe(evname);
 			printf("bpf_detach_kprobe: ret=%d\n", ret);
 
-		} else if (!strcmp(cmd, "BPF_ATTACH_UPROBE")) {
-			int len, ret, prog_fd, type, pid;
+		} else if (!strcmp(in->cmd, "BPF_ATTACH_UPROBE")) {
+			int ret, prog_fd, type, pid;
 			char *ev_name, *binary_path;
 			uint64_t offset;
 
-			PARSE_FIRST_INT(prog_fd);
+			PARSE_INT(prog_fd);
 			PARSE_INT(type);
 			PARSE_STR(ev_name);
 			PARSE_STR(binary_path);
@@ -572,23 +559,23 @@ int main(int argc, char **argv)
 
 			printf("bpf_attach_uprobe: ret=%d\n", ret);
 
-		} else if (!strcmp(cmd, "BPF_DETACH_UPROBE")) {
-			int len, ret;
+		} else if (!strcmp(in->cmd, "BPF_DETACH_UPROBE")) {
+			int ret;
 			char *evname;
 
-			PARSE_FIRST_STR(evname);
+			PARSE_STR(evname);
 			ret = bpf_detach_uprobe(evname);
 			printf("bpf_detach_uprobe: ret=%d\n", ret);
 
-		} else if (!strcmp(cmd, "BPF_ATTACH_TRACEPOINT")) {
-			int len, ret, prog_fd;
+		} else if (!strcmp(in->cmd, "BPF_ATTACH_TRACEPOINT")) {
+			int ret, prog_fd;
 			char *tpname, *category;
 			/*
 			 * void * bpf_attach_tracepoint(int progfd, const char *tp_category,
 			 *		const char *tp_name, perf_reader_cb cb, void *cb_cookie)
 			 */
 
-			PARSE_FIRST_INT(prog_fd);
+			PARSE_INT(prog_fd);
 			PARSE_STR(category);
 			PARSE_STR(tpname);
 
@@ -602,17 +589,17 @@ int main(int argc, char **argv)
 
 			printf("bpf_attach_tracepoint: ret=%d\n", ret);
 
-		} else if (!strcmp(cmd, "BPF_CREATE_MAP")) {
+		} else if (!strcmp(in->cmd, "BPF_CREATE_MAP")) {
 			/*
 				int bpf_create_map(enum bpf_map_type map_type, const char *name,
                    int key_size, int value_size, int max_entries,
                    int map_flags);
 			 */
 
-			int ret, type, len, key_size, value_size, max_entries, map_flags;
+			int ret, type, key_size, value_size, max_entries, map_flags;
 			char *name;
 
-			PARSE_FIRST_INT(type);
+			PARSE_INT(type);
 			PARSE_STR(name);
 			PARSE_INT(key_size);
 			PARSE_INT(value_size);
@@ -624,22 +611,22 @@ int main(int argc, char **argv)
 			ret = bpf_create_map((enum bpf_map_type)type, name, key_size, value_size, max_entries, map_flags);
 			printf("bpf_create_map: ret=%d\n", ret);
 
-		} else if (!strcmp(cmd, "BPF_OPEN_PERF_BUFFER")) {
+		} else if (!strcmp(in->cmd, "BPF_OPEN_PERF_BUFFER")) {
 			int pid, cpu, page_cnt, ret;
 
-			PARSE_FIRST_INT(pid);
+			PARSE_INT(pid);
 			PARSE_INT(cpu);
 			PARSE_INT(page_cnt);
 
 			ret = bpf_remote_open_perf_buffer(pid, cpu, page_cnt);
 			printf("bpf_open_perf_buffer: ret=%d\n", ret);
 
-		} else if (!strcmp(cmd, "BPF_UPDATE_ELEM")) {
+		} else if (!strcmp(in->cmd, "BPF_UPDATE_ELEM")) {
 			int map_fd, klen, llen, ret;
 			unsigned long long flags;
-			char *tok, *kstr, *lstr;
+			char *kstr, *lstr;
 
-			PARSE_FIRST_INT(map_fd);
+			PARSE_INT(map_fd);
 			PARSE_STR(kstr);
 			PARSE_INT(klen);
 			PARSE_STR(lstr);
@@ -649,11 +636,11 @@ int main(int argc, char **argv)
 			ret = bpf_remote_update_elem(map_fd, kstr, klen, lstr, llen, flags);
 			printf("bpf_update_elem: ret=%d\n", ret);
 
-		} else if (!strcmp(cmd, "BPF_LOOKUP_ELEM")) {
+		} else if (!strcmp(in->cmd, "BPF_LOOKUP_ELEM")) {
 			int map_fd, klen, llen;
-			char *tok, *kstr, *lstr;
+			char *kstr, *lstr;
 
-			PARSE_FIRST_INT(map_fd);
+			PARSE_INT(map_fd);
 			PARSE_STR(kstr);
 			PARSE_INT(klen);
 			PARSE_INT(llen);
@@ -665,11 +652,11 @@ int main(int argc, char **argv)
 				printf("%s\n", lstr);
 			if (lstr) free(lstr);
 
-		} else if (!strcmp(cmd, "BPF_GET_FIRST_KEY")) {
+		} else if (!strcmp(in->cmd, "BPF_GET_FIRST_KEY")) {
 			int map_fd, klen, llen, dump_all;
-			char *tok, *kstr;
+			char *kstr;
 
-			PARSE_FIRST_INT(map_fd);
+			PARSE_INT(map_fd);
 			PARSE_INT(klen);
 			PARSE_INT(llen);
 			PARSE_INT(dump_all);
@@ -685,11 +672,11 @@ int main(int argc, char **argv)
 				printf("%s\n", kstr);
 			if (kstr) free(kstr);
 
-		} else if (!strcmp(cmd, "BPF_GET_NEXT_KEY")) {
+		} else if (!strcmp(in->cmd, "BPF_GET_NEXT_KEY")) {
 			int map_fd, klen;
-			char *tok, *kstr, *next_kstr;
+			char *kstr, *next_kstr;
 
-			PARSE_FIRST_INT(map_fd);
+			PARSE_INT(map_fd);
 			PARSE_STR(kstr);
 			PARSE_INT(klen);
 
@@ -700,30 +687,30 @@ int main(int argc, char **argv)
 				printf("%s\n", next_kstr);
 			if (next_kstr) free(next_kstr);
 
-		} else if (!strcmp(cmd, "BPF_DELETE_ELEM")) {
+		} else if (!strcmp(in->cmd, "BPF_DELETE_ELEM")) {
 			int map_fd, klen, ret;
-			char *tok, *kstr;
+			char *kstr;
 
-			PARSE_FIRST_INT(map_fd);
+			PARSE_INT(map_fd);
 			PARSE_STR(kstr);
 			PARSE_INT(klen);
 
 			ret = bpf_remote_delete_elem(map_fd, kstr, klen);
 			printf("bpf_delete_elem: ret=%d\n", ret);
 
-		} else if (!strcmp(cmd, "BPF_CLEAR_MAP")) {
+		} else if (!strcmp(in->cmd, "BPF_CLEAR_MAP")) {
 			int map_fd, klen, ret;
 
-			PARSE_FIRST_INT(map_fd);
+			PARSE_INT(map_fd);
 			PARSE_INT(klen);
 
 			ret = bpf_clear_map(map_fd, klen);
 			printf("bpf_clear_map: ret=%d\n", ret);
 
-		} else if (!strcmp(cmd, "PERF_READER_POLL")) {
+		} else if (!strcmp(in->cmd, "PERF_READER_POLL")) {
 			int len, *fds, i, timeout, ret;
 
-			PARSE_FIRST_INT(timeout);
+			PARSE_INT(timeout);
 			PARSE_INT(len);
 
 			fds = (void *)malloc(len);
@@ -737,12 +724,12 @@ int main(int argc, char **argv)
 			ret = remote_perf_reader_poll(fds, len, timeout);
 			if (ret < 0)
 				printf("perf_reader_poll: ret=%d\n", ret);
-		} else if (!strcmp(cmd, "GET_KSYM_NAME")) {
-			int len, ret;
+		} else if (!strcmp(in->cmd, "GET_KSYM_NAME")) {
+			int ret;
 			uint64_t addr;
 			struct bcc_symbol sym;
 
-			PARSE_FIRST_UINT64(addr);
+			PARSE_UINT64(addr);
 
 			if(!ksym_cache)
 				ksym_cache = bcc_symcache_new(-1, NULL);
@@ -751,12 +738,12 @@ int main(int argc, char **argv)
 			printf("GET_KSYM_NAME: ret=%d\n", ret);
 			if (!ret)
 				printf("%s;%"PRIu64";%s\n", sym.name, sym.offset, sym.module);
-		} else if (!strcmp(cmd, "GET_KSYM_ADDR")) {
-			int len, ret;
+		} else if (!strcmp(in->cmd, "GET_KSYM_ADDR")) {
+			int ret;
 			char* name;
 			uint64_t addr;
 
-			PARSE_FIRST_STR(name);
+			PARSE_STR(name);
 
 			if(!ksym_cache)
 				ksym_cache = bcc_symcache_new(-1, NULL);
@@ -765,14 +752,14 @@ int main(int argc, char **argv)
 			printf("GET_KSYM_ADDR: ret=%d\n", ret);
 			if (!ret)
 				printf("%"PRIu64"\n", addr);
-		} else if (!strcmp(cmd, "GET_USYM_NAME")) {
-			int len, ret, pid, demangle;
+		} else if (!strcmp(in->cmd, "GET_USYM_NAME")) {
+			int ret, pid, demangle;
 			uint64_t addr;
 			struct bcc_symbol sym;
 			const char *name;
 			struct usym_cache *usym_cache = NULL;
 
-			PARSE_FIRST_INT(pid);
+			PARSE_INT(pid);
 			PARSE_UINT64(addr);
 			PARSE_INT(demangle);
 
@@ -792,14 +779,14 @@ int main(int argc, char **argv)
 				printf("%s;%"PRIu64";%s\n", name, sym.offset, sym.module);
 			}
 			bcc_symbol_free_demangle_name(&sym);
-		} else if (!strcmp(cmd, "GET_USYM_ADDR")) {
-			int len, ret, pid;
+		} else if (!strcmp(in->cmd, "GET_USYM_ADDR")) {
+			int ret, pid;
 			char *name;
 			char *module;
 			uint64_t addr;
 			struct usym_cache *usym_cache = NULL;
 
-			PARSE_FIRST_INT(pid);
+			PARSE_INT(pid);
 			PARSE_STR(name);
 			PARSE_STR(module);
 
@@ -817,6 +804,9 @@ invalid_command:
 
 		printf("END_BPFD_OUTPUT\n");
 		fflush(stdout);
+
+		free_user_input(in);
+		in = NULL;
 	}
 	free_usym_caches(usym_caches);
 	return 0;

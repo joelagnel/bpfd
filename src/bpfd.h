@@ -17,70 +17,40 @@
  * limitations under the License.
  */
 
-#include <inttypes.h>
-
 #include "utils.h"
 #include "base64.h"
 #include "libbpf.h"
+#include "cmd_parsers.h"
 
-#define PARSE_INT(var)				\
-	tok = strtok(NULL, " ");		\
-	if (!tok)				\
-		goto invalid_command;		\
-	if (!sscanf(tok, "%d ", &var))		\
-		goto invalid_command;
+#define PARSE_INT(var)						\
+{								\
+	int p = parse_int_arg(in, arg_index++, &var);		\
+	if (p) goto invalid_command;				\
+}
 
-#define PARSE_UINT(var)				\
-	tok = strtok(NULL, " ");		\
-	if (!tok)				\
-		goto invalid_command;		\
-	if (!sscanf(tok, "%u ", &var))		\
-		goto invalid_command;
+#define PARSE_UINT(var)						\
+{								\
+	int p = parse_uint_arg(in, arg_index++, &var);		\
+	if (p) goto invalid_command;				\
+}
 
-#define PARSE_UINT64(var)			\
-	tok = strtok(NULL, " ");		\
-	if (!tok)				\
-		goto invalid_command;		\
-	if (!sscanf(tok, "%"SCNu64" ", &var))	\
-		goto invalid_command;
+#define PARSE_UINT64(var)					\
+{								\
+	int p = parse_uint64_arg(in, arg_index++, &var);	\
+	if (p) goto invalid_command;				\
+}
 
-#define PARSE_ULL(var)				\
-	tok = strtok(NULL, " ");		\
-	if (!tok)				\
-		goto invalid_command;		\
-	if (!sscanf(tok, "%llu ", &var))	\
-		goto invalid_command;
+#define PARSE_ULL(var)						\
+{								\
+	int p = parse_ull_arg(in, arg_index++, &var);		\
+	if (p) goto invalid_command;				\
+}
 
-#define PARSE_STR(var)				\
-	tok = strtok(NULL, " ");		\
-	if (!tok)				\
-		goto invalid_command;		\
-	var = tok;
-
-#define PARSE_FIRST_TOK				\
-	len = strlen(argstr);			\
-	tok = strtok(argstr, " ");		\
-	if (strlen(tok) == len)			\
-		goto invalid_command;
-
-#define PARSE_FIRST_INT(var)		\
-	PARSE_FIRST_TOK					\
-	if (!sscanf(tok, "%d ", &var))	\
-		goto invalid_command;
-
-#define PARSE_FIRST_UINT(var)		\
-	PARSE_FIRST_TOK					\
-	if (!sscanf(tok, "%u ", &var))	\
-		goto invalid_command;
-
-#define PARSE_FIRST_UINT64(var)		\
-	PARSE_FIRST_TOK					\
-	if (!sscanf(tok, "%"SCNu64" ", &var))	\
-		goto invalid_command;
-
-#define PARSE_FIRST_STR(var)		\
-	PARSE_FIRST_TOK					\
-	var = tok;
+#define PARSE_STR(var)						\
+{								\
+	int p = parse_str_arg(in, arg_index++, &var);		\
+	if (p) goto invalid_command;				\
+}
 
 int bpf_remote_open_perf_buffer(int pid, int cpu, int page_cnt);
 int remote_perf_reader_poll(int *fds, int len, int timeout);
