@@ -97,7 +97,7 @@ LLVM's libraries are needed to run BCC tools. Add the last line above to your `.
 These steps were executed on Ubuntu distro. If they don't work for your distro, [check BCC project's
 INSTALL.md](https://github.com/iovisor/bcc/blob/master/INSTALL.md) for other instructions.
 ```
-git clone git@github.com:joelagnel/bcc.git
+git clone https://github.com/joelagnel/bcc.git
 cd bcc
 git checkout -b bcc-bpfd origin/bcc-bpfd
 mkdir -p build; cd build
@@ -118,7 +118,7 @@ You must build BPFd differently depending on the architecture of the target mach
 
 #### To build BPFd for x86
 ```
-git clone git@github.com:joelagnel/bpfd.git; cd bpfd
+git clone https://github.com/joelagnel/bpfd.git; cd bpfd
 mkdir -p build; cd build
 cmake ..
 make
@@ -161,7 +161,7 @@ sudo make install
 
 Once all the dependencies are ready, you can then finally build BPFd for arm64:
 ```
-git clone git@github.com:joelagnel/bpfd.git; cd bpfd
+git clone https://github.com/joelagnel/bpfd.git; cd bpfd
 mkdir -p build; cd build
 cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchain-aarch64.cmake ..
 make
