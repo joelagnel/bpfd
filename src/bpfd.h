@@ -53,4 +53,4 @@
 }
 
 int bpf_remote_open_perf_buffer(int pid, int cpu, int page_cnt);
-int remote_perf_reader_poll(int *fds, int len, int timeout);
+int remote_perf_reader_poll(int *fds, int num_readers, int timeout);

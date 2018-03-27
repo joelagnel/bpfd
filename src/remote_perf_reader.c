@@ -23,6 +23,7 @@
  * struct here
  */
 
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -88,19 +89,33 @@ int bpf_remote_open_perf_buffer(int pid, int cpu, int page_cnt)
 	return reader->fd;
 }
 
-int remote_perf_reader_poll(int *fds, int len, int timeout)
+int remote_perf_reader_poll(int *fds, int num_readers, int timeout)
 {
-	struct perf_reader **readers;
-	int i, ret;
+	struct pollfd pfds[num_readers + 1];
+	int i, fd, ret;
 
-	readers = (struct perf_reader **)malloc(len * sizeof(void *));
+	for (i = 0; i < num_readers; i++) {
+		fd = fds[i];
+		if (!remote_readers[fd])
+			continue;
+		pfds[i].fd = fd;
+		pfds[i].events = POLLIN;
+	}
 
-	for (i = 0; i < len; i++)
-		readers[i] = remote_readers[fds[i]];
+	// Include stdin in the collection of file descriptors to poll.
+	// This is so that user input to bpfd via stdin can still be acted
+	// on immediately. Not doing this will lead to bpfd being unable to
+	// respond to user input until after poll() returns.
+	pfds[num_readers].fd = 0;
+	pfds[num_readers].events = POLLIN;
 
-	ret = perf_reader_poll(len, readers, timeout);
+	if (poll(pfds, num_readers + 1, timeout) > 0) {
+		for (i = 0; i < num_readers + 1; i++) {
+			fd = pfds[i].fd;
+			if (fd != 0 && pfds[i].revents & POLLIN)
+				perf_reader_event_read(remote_readers[fd]);
+		}
+	}
 
-	free(readers);
-
-	return ret;
+	return 0;
 }
