@@ -589,6 +589,23 @@ int main(int argc, char **argv)
 
 			printf("bpf_attach_tracepoint: ret=%d\n", ret);
 
+		} else if (!strcmp(in->cmd, "BPF_ATTACH_PERF_EVENT")) {
+			int ret, progfd, pid, cpu, group_fd;
+			uint32_t ev_type, ev_config;
+			uint64_t sample_period, sample_freq;
+
+			PARSE_INT(progfd);
+			PARSE_UINT32(ev_type);
+			PARSE_UINT32(ev_config);
+			PARSE_UINT64(sample_period);
+			PARSE_UINT64(sample_freq);
+			PARSE_INT(pid);
+			PARSE_INT(cpu);
+			PARSE_INT(group_fd);
+
+			ret = bpf_attach_perf_event(progfd, ev_type, ev_config,
+				sample_period, sample_freq, pid, cpu, group_fd);
+			printf("bpf_attach_perf_event: ret=%d\n", ret);
 		} else if (!strcmp(in->cmd, "BPF_CREATE_MAP")) {
 			/*
 				int bpf_create_map(enum bpf_map_type map_type, const char *name,

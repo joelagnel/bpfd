@@ -34,6 +34,12 @@
 	if (p) goto invalid_command;				\
 }
 
+#define PARSE_UINT32(var)					\
+{								\
+	int p = parse_uint32_arg(in, arg_index++, &var);	\
+	if (p) goto invalid_command;				\
+}
+
 #define PARSE_UINT64(var)					\
 {								\
 	int p = parse_uint64_arg(in, arg_index++, &var);	\
