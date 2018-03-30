@@ -114,7 +114,7 @@ int parse_uint_arg(const struct user_input *in, int index, unsigned int *val)
 	return !(sscanf(in->args[index], "%u", val) == 1);
 }
 
-int parse_uint32_arg(const struct user_input *in, int index, uint64_t *val)
+int parse_uint32_arg(const struct user_input *in, int index, uint32_t *val)
 {
 	if (index < 0 || index > in->num_args - 1)
 		return -1;
