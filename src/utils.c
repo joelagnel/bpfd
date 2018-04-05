@@ -44,19 +44,20 @@ int cat_file(char *path) {
 	close(fd);
 
 	return 0;
-
 }
 
 /* Read a tracefs file to stdout */
 int cat_tracefs_file(char *tracefs, char *fn) {
-	char tracef[100];
+	int res = 0;
 
-	tracef[0] = 0;
-	strcat(tracef, tracefs);
-	strcat(tracef, "/");
-	strcat(tracef, fn);
+	int buf_len = strlen(tracefs) + strlen(fn) + 2; // +2 for '/' and '\0'
+	char *tracef = (char *)malloc(buf_len);
+	snprintf(tracef, buf_len, "%s/%s", tracefs, fn);
 
-	return cat_file(tracef);
+	res = cat_file(tracef);
+
+	free(tracef);
+	return res;
 }
 
 int cat_dir(char *path, int dirs_only)

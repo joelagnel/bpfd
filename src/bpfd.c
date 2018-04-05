@@ -74,25 +74,30 @@ int bpf_prog_load_handle(int type, char *name, char *bin_b64, int prog_len, char
 
 int get_trace_events(char *tracefs, char *category)
 {
-	char tracef[256];
+	int res = 0;
 
-	tracef[0] = 0;
-	strcat(tracef, tracefs);
-	strcat(tracef, "/events/");
-	strcat(tracef, category);
+	int buf_len = strlen(tracefs) + strlen("/events/") + strlen(category) + 1;
+	char *tracef = (char *)malloc(buf_len);
+	snprintf(tracef, buf_len, "%s/events/%s", tracefs, category);
 
-	return cat_dir(tracef, 1);
+	res = cat_dir(tracef, 1);
+
+	free(tracef);
+	return res;
 }
 
 int get_trace_events_categories(char *tracefs)
 {
-	char tracef[256];
+	int res = 0;
 
-	tracef[0] = 0;
-	strcat(tracef, tracefs);
-	strcat(tracef, "/events");
+	int buf_len = strlen(tracefs) + strlen("/events") + 1;
+	char *tracef = (char *)malloc(buf_len);
+	snprintf(tracef, buf_len, "%s/events", tracefs);
 
-	return cat_dir(tracef, 1);
+	res = cat_dir(tracef, 1);
+
+	free(tracef);
+	return res;
 }
 
 int bpf_remote_update_elem(int map_fd, char *kstr, int klen,
