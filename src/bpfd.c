@@ -399,32 +399,9 @@ int main(int argc, char **argv)
 {
 	struct user_input *in = NULL;
 	char line_buf[LINEBUF_SIZE];
-	char *kvers_str = NULL;
-	int arg_index = 0, c, kvers = -1;
+	int arg_index = 0;
 	void *ksym_cache = NULL;
 	struct usym_cache **usym_caches = (struct usym_cache **)calloc(DEFAULT_MAX_PID, sizeof(struct usym_cache *));
-
-	opterr = 0;
-	while ((c = getopt (argc, argv, "k:")) != -1)
-		switch (c)
-		{
-			case 'k':
-				kvers_str = optarg;
-				break;
-			case '?':
-				if (optopt == 'k')
-					fprintf(stderr, "Option -%c requires an argument.\n", optopt);
-				else if (isprint (optopt))
-					fprintf(stderr, "Unknown option `-%c'.\n", optopt);
-				else
-					fprintf(stderr,"Unknown option character `\\x%x'.\n", optopt);
-				return 1;
-			default:
-				abort();
-		}
-
-	if (kvers_str)
-		kvers = atoi(kvers_str);
 
 	printf("STARTED_BPFD\n");
 
@@ -484,7 +461,7 @@ int main(int argc, char **argv)
 
 			int prog_len, type;
 			char *license, *bin_data, *name;
-			unsigned int kern_version, kvdummy;
+			unsigned int kern_version;
 
 			/*
 			 * Command format: BPF_PROG_LOAD type prog_len license kern_version binary_data
@@ -498,12 +475,7 @@ int main(int argc, char **argv)
 			PARSE_STR(name);
 			PARSE_INT(prog_len);
 			PARSE_STR(license);
-			if (kvers != -1) {
-				kern_version = kvers;
-				PARSE_UINT(kvdummy);  /* skip field */
-			} else {
-				PARSE_UINT(kern_version);
-			}
+			PARSE_UINT(kern_version);
 			PARSE_STR(bin_data);
 
 			if (!strcmp(name, "__none__"))
