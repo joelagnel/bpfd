@@ -44,7 +44,7 @@ void free_user_input(struct user_input *in);
  */
 int parse_int_arg(const struct user_input *in, int index, int *val);
 int parse_uint_arg(const struct user_input *in, int index, unsigned int *val);
-int parse_uint32_arg(const struct user_input *in, int index, uint64_t *val);
+int parse_uint32_arg(const struct user_input *in, int index, uint32_t *val);
 int parse_uint64_arg(const struct user_input *in, int index, uint64_t *val);
 int parse_ull_arg(const struct user_input *in, int index, unsigned long long *val);
 int parse_str_arg(const struct user_input *in, int index, char **val);
