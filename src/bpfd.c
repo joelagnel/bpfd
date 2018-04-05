@@ -561,6 +561,16 @@ int main(int argc, char **argv)
 
 			printf("bpf_attach_tracepoint: ret=%d\n", ret);
 
+		} else if (!strcmp(in->cmd, "BPF_DETACH_TRACEPOINT")) {
+			int ret;
+			char *tpname, *category;
+
+			PARSE_STR(category);
+			PARSE_STR(tpname);
+
+			ret = bpf_detach_tracepoint(category, tpname);
+			printf("bpf_detach_tracepoint: ret=%d\n", ret);
+
 		} else if (!strcmp(in->cmd, "BPF_ATTACH_PERF_EVENT")) {
 			int ret, progfd, pid, cpu, group_fd;
 			uint32_t ev_type, ev_config;
