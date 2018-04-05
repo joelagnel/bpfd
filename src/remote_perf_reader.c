@@ -71,16 +71,11 @@ void remote_raw_reader_cb(void *cookie, void *raw, int size)
 	free(raw_str);
 }
 
-void remote_lost_reader_cb(void *ptr, uint64_t lost)
-{
-}
-
 int bpf_remote_open_perf_buffer(int pid, int cpu, int page_cnt)
 {
 	struct perf_reader *reader;
 
-	reader = bpf_open_perf_buffer(remote_raw_reader_cb, remote_lost_reader_cb,
-								  NULL, pid, cpu, page_cnt);
+	reader = bpf_open_perf_buffer(remote_raw_reader_cb, NULL, NULL, pid, cpu, page_cnt);
 	if (!reader)
 		return -1;
 
