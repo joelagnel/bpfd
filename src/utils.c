@@ -60,6 +60,14 @@ int cat_tracefs_file(char *tracefs, char *fn) {
 	return res;
 }
 
+int cat_comm_file(int pid) {
+	char commf[100];
+
+	snprintf(commf, 100, "/proc/%d/comm", pid);
+
+	return cat_file(commf);
+}
+
 int cat_dir(char *path, int dirs_only)
 {
 	DIR *dp;

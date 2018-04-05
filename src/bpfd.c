@@ -462,6 +462,14 @@ int main(int argc, char **argv)
 			if (get_trace_events(tracefs, category) < 0)
 				goto invalid_command;
 
+		} else if (!strcmp(in->cmd, "COMM_FOR_PID")) {
+			int pid;
+
+			PARSE_INT(pid);
+
+			if (cat_comm_file(pid) < 0)
+				goto invalid_command;
+
 		} else if (!strcmp(in->cmd, "BPF_PROG_LOAD")) {
 
 			int prog_len, type;
