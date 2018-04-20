@@ -19,4 +19,5 @@
 
 int cat_file(char *path);
 int cat_tracefs_file(char *tracefs, char *fn);
+int cat_comm_file(int pid);
 int cat_dir(char *path, int dirs_only);
