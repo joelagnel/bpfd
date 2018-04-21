@@ -23,94 +23,76 @@
  * struct here
  */
 
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <linux/bpf.h>
 #include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <linux/bpf.h>
-#include <arpa/inet.h>
-#include "perf_reader.h"
+#include <unistd.h>
 #include "bpfd.h"
+#include "perf_reader.h"
 
 #define MAX_READERS 1024
 
-struct perf_reader {
-  perf_reader_cb cb;
-  perf_reader_raw_cb raw_cb;
-  perf_reader_lost_cb lost_cb;
-  void *cb_cookie; // to be returned in the cb
-  void *buf; // for keeping segmented data
-  size_t buf_size;
-  void *base;
-  int page_size;
-  int page_cnt;
-  int fd;
-  uint32_t type;
-  uint64_t sample_type;
-};
-
 struct perf_reader *remote_readers[MAX_READERS];
 
-void remote_raw_reader_cb(void *cookie, void *raw, int size)
-{
-	struct perf_reader *reader = cookie;
-	char *raw_str;
+void remote_raw_reader_cb(void *cookie, void *raw, int size) {
+  struct perf_reader *reader = cookie;
+  char *raw_str;
 
-	raw_str = malloc(size * 4);
+  raw_str = malloc(size * 4);
 
-	if (!base64_encode(raw, size, raw_str, size*4))
-		printf("raw_cb: b64 encode failed for reader fd=%d\n",
-			   reader->fd);
+  if (!base64_encode(raw, size, raw_str, size * 4))
+    printf("raw_cb: b64 encode failed for reader fd=%d\n", reader->fd);
 
-	printf("%d %d %s\n", reader->fd, size, raw_str);
+  printf("%d %d %s\n", reader->fd, size, raw_str);
 
-	free(raw_str);
+  free(raw_str);
 }
 
-int bpf_remote_open_perf_buffer(int pid, int cpu, int page_cnt)
-{
-	struct perf_reader *reader;
+int bpf_remote_open_perf_buffer(int pid, int cpu, int page_cnt) {
+  struct perf_reader *reader;
 
-	reader = bpf_open_perf_buffer(remote_raw_reader_cb, NULL, NULL, pid, cpu, page_cnt);
-	if (!reader)
-		return -1;
+  reader = bpf_open_perf_buffer(remote_raw_reader_cb, NULL, NULL, pid, cpu,
+                                page_cnt);
+  if (!reader)
+    return -1;
 
-	reader->cb_cookie = reader;
-	remote_readers[reader->fd] = reader;
-	return reader->fd;
+  reader->cb_cookie = reader;
+  remote_readers[reader->fd] = reader;
+  return reader->fd;
 }
 
-int remote_perf_reader_poll(int *fds, int num_readers, int timeout)
-{
-	struct pollfd pfds[num_readers + 1];
-	int i, fd, ret;
+int remote_perf_reader_poll(int *fds, int num_readers, int timeout) {
+  struct pollfd pfds[num_readers + 1];
+  int i, fd;
 
-	for (i = 0; i < num_readers; i++) {
-		fd = fds[i];
-		if (!remote_readers[fd])
-			continue;
-		pfds[i].fd = fd;
-		pfds[i].events = POLLIN;
-	}
+  for (i = 0; i < num_readers; i++) {
+    fd = fds[i];
+    if (!remote_readers[fd])
+      continue;
+    pfds[i].fd = fd;
+    pfds[i].events = POLLIN;
+  }
 
-	// Include stdin in the collection of file descriptors to poll.
-	// This is so that user input to bpfd via stdin can still be acted
-	// on immediately. Not doing this will lead to bpfd being unable to
-	// respond to user input until after poll() returns.
-	pfds[num_readers].fd = 0;
-	pfds[num_readers].events = POLLIN;
+  // Include stdin in the collection of file descriptors to poll.
+  // This is so that user input to bpfd via stdin can still be acted
+  // on immediately. Not doing this will lead to bpfd being unable to
+  // respond to user input until after poll() returns.
+  pfds[num_readers].fd = 0;
+  pfds[num_readers].events = POLLIN;
 
-	if (poll(pfds, num_readers + 1, timeout) > 0) {
-		for (i = 0; i < num_readers + 1; i++) {
-			fd = pfds[i].fd;
-			if (fd != 0 && pfds[i].revents & POLLIN)
-				perf_reader_event_read(remote_readers[fd]);
-		}
-	}
+  if (poll(pfds, num_readers + 1, timeout) > 0) {
+    for (i = 0; i < num_readers + 1; i++) {
+      fd = pfds[i].fd;
+      if (fd != 0 && pfds[i].revents & POLLIN)
+        perf_reader_event_read(remote_readers[fd]);
+    }
+  }
 
-	return 0;
+  return 0;
 }

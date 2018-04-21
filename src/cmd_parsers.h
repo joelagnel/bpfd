@@ -17,18 +17,19 @@
  */
 
 struct user_input {
-	char *cmd;
-	char **args;
-	int num_args;
+  char *cmd;
+  char **args;
+  int num_args;
 };
 
 /*
  * Parses the string into a user_input struct object.
  * The string is assumed to take the format of
  *
- * 	cmd arg1 arg2 arg3 ... argn
+ *   cmd arg1 arg2 arg3 ... argn
  *
- * If no cmd is provided (i.e. an empty string), the 'cmd' and 'args' fields are set to NULL.
+ * If no cmd is provided (i.e. an empty string), the 'cmd' and 'args' fields are
+ * set to NULL.
  * If a cmd is provided, but with no args, only the 'args' field is set to NULL.
  */
 struct user_input *parse_user_input(const char *str);
@@ -46,5 +47,6 @@ int parse_int_arg(const struct user_input *in, int index, int *val);
 int parse_uint_arg(const struct user_input *in, int index, unsigned int *val);
 int parse_uint32_arg(const struct user_input *in, int index, uint32_t *val);
 int parse_uint64_arg(const struct user_input *in, int index, uint64_t *val);
-int parse_ull_arg(const struct user_input *in, int index, unsigned long long *val);
+int parse_ull_arg(const struct user_input *in, int index,
+                  unsigned long long *val);
 int parse_str_arg(const struct user_input *in, int index, char **val);

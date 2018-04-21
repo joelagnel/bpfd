@@ -85,7 +85,7 @@ static const char *parse_stapsdt_note(struct bcc_elf_usdt *probe,
 
 static int do_note_segment(Elf_Scn *section, int elf_class,
                            bcc_elf_probecb callback, const char *binpath,
-                           void *payload) {
+                           uint64_t first_inst_offset, void *payload) {
   Elf_Data *data = NULL;
 
   while ((data = elf_getdata(section, data)) != 0) {
@@ -110,8 +110,14 @@ static int do_note_segment(Elf_Scn *section, int elf_class,
       desc = (const char *)data->d_buf + desc_off;
       desc_end = desc + hdr.n_descsz;
 
-      if (parse_stapsdt_note(&probe, desc, elf_class) == desc_end)
-        callback(binpath, &probe, payload);
+      if (parse_stapsdt_note(&probe, desc, elf_class) == desc_end) {
+        if (probe.pc < first_inst_offset)
+          fprintf(stderr,
+                  "WARNING: invalid address 0x%lx for probe (%s,%s) in binary %s\n",
+                  probe.pc, probe.provider, probe.name, binpath);
+        else
+          callback(binpath, &probe, payload);
+      }
     }
   }
   return 0;
@@ -122,9 +128,25 @@ static int listprobes(Elf *e, bcc_elf_probecb callback, const char *binpath,
   Elf_Scn *section = NULL;
   size_t stridx;
   int elf_class = gelf_getclass(e);
+  uint64_t first_inst_offset = 0;
 
   if (elf_getshdrstrndx(e, &stridx) != 0)
     return -1;
+
+  // Get the offset to the first instruction
+  while ((section = elf_nextscn(e, section)) != 0) {
+    GElf_Shdr header;
+
+    if (!gelf_getshdr(section, &header))
+      continue;
+
+    // The elf file section layout is based on increasing virtual address,
+    // getting the first section with SHF_EXECINSTR is enough.
+    if (header.sh_flags & SHF_EXECINSTR) {
+      first_inst_offset = header.sh_addr;
+      break;
+    }
+  }
 
   while ((section = elf_nextscn(e, section)) != 0) {
     GElf_Shdr header;
@@ -138,7 +160,8 @@ static int listprobes(Elf *e, bcc_elf_probecb callback, const char *binpath,
 
     name = elf_strptr(e, stridx, header.sh_name);
     if (name && !strcmp(name, ".note.stapsdt")) {
-      if (do_note_segment(section, elf_class, callback, binpath, payload) < 0)
+      if (do_note_segment(section, elf_class, callback, binpath,
+                          first_inst_offset, payload) < 0)
         return -1;
     }
   }
@@ -188,8 +211,6 @@ static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
         continue;
 
       uint32_t st_type = ELF_ST_TYPE(sym.st_info);
-      if (sym.st_size == 0 && (st_type == STT_FUNC || st_type == STT_GNU_IFUNC))
-        continue;
       if (!(option->use_symbol_type & (1 << st_type)))
         continue;
 
@@ -477,6 +498,41 @@ int bcc_elf_foreach_sym(const char *path, bcc_elf_symcb callback,
                         void *option, void *payload) {
   return foreach_sym_core(
       path, callback, (struct bcc_symbol_option*)option, payload, 0);
+}
+
+int bcc_elf_get_text_scn_info(const char *path, uint64_t *addr,
+				   uint64_t *offset) {
+  Elf *e = NULL;
+  int fd = -1, err;
+  Elf_Scn *section = NULL;
+  GElf_Shdr header;
+  size_t stridx;
+  char *name;
+
+  if ((err = openelf(path, &e, &fd)) < 0 ||
+      (err = elf_getshdrstrndx(e, &stridx)) < 0)
+    goto exit;
+
+  err = -1;
+  while ((section = elf_nextscn(e, section)) != 0) {
+    if (!gelf_getshdr(section, &header))
+      continue;
+
+    name = elf_strptr(e, stridx, header.sh_name);
+    if (name && !strcmp(name, ".text")) {
+      *addr = (uint64_t)header.sh_addr;
+      *offset = (uint64_t)header.sh_offset;
+      err = 0;
+      break;
+    }
+  }
+
+exit:
+  if (e)
+    elf_end(e);
+  if (fd >= 0)
+    close(fd);
+  return err;
 }
 
 int bcc_elf_foreach_load_section(const char *path,
