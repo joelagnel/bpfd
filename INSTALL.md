@@ -1,3 +1,5 @@
+Please make sure to look at [README](https://github.com/joelagnel/bpfd/blob/master/README.md) first.
+
 # Install and run BCC tools and BPFd from a package
 
 If you only care about running/adding/modifying new BCC tools and don't care about changing the core infrastructure of
