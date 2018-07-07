@@ -174,8 +174,10 @@ The built binaries are available in the build directory.
 In case of errors when building for arm64, check that the path to the `aarch64-linux-gnu` toolchain in `toolchain-aarch64.cmake` is suitable for your distribution.
 
 #### Installation
-Installation really depends on the remote target. For arm64, copy the `build/bpfd` to your bin/ directory. For Android
-arm64 devices, push bpfd to the data partition by running:
+Installation really depends on the remote target.
+1. For installation on your local development machine, copy 'build/bpfd' to /usr/bin directory. 
+2. For arm64, copy the `build/bpfd` to your bin/ directory. 
+3. For Android arm64 devices, push bpfd to the data partition by running:
 ```
 adb push build/bpfd /data/
 ```
@@ -204,7 +206,9 @@ sourcing. Here's one for [adb interface with an arm64 Android
 target](https://github.com/joelagnel/bcc/blob/bcc-bpfd/arm64-adb.rc) and another one for a [local x86 target with a
 process remote](https://github.com/joelagnel/bcc/blob/bcc-bpfd/x86-local.rc).
 
-You should be all set, try running simple tools like `opensnoop` or `syscount`. For debugging, you could set the
+You should be all set, try running simple tools like `opensnoop` or `syscount`. 
+Notice to use sudo -E if you use sudo for running applications that use BPF, in order to pass the environment variables you've set for BCC.  
+For debugging, you could set the
 following environment variables and check the output.
 
 To debug kernel build process (path to kernel sources, flags):
