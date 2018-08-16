@@ -5,22 +5,12 @@
 #include <linux/elf.h>
 #include <unistd.h>
 
-void die(void) {
-	perror("error");
-	exit(0);
-}
-
-void assert(int ret)
-{
-	if (!ret)
-		die();
-}
-
-void read_elf_header(int32_t fd, Elf32_Ehdr *elf_header)
-{
-	assert(elf_header != NULL);
-	assert(lseek(fd, (off_t)0, SEEK_SET) == (off_t)0);
-	assert(read(fd, (void *)elf_header, sizeof(Elf32_Ehdr)) == sizeof(Elf32_Ehdr));
+#define assert(cond) if (!cond) {						\
+	char line[20];										\
+	if (errno == 0) errno = -1;							\
+	sprintf(line, "Error at function: %s line:%d file: %s", \
+			__func__, __LINE__, __FILE__);				\
+	perror(line); exit(0);								\
 }
 
 int main()
