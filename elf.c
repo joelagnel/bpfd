@@ -13,63 +13,130 @@
 	perror(line); exit(0);								\
 }
 
-int main()
+Elf64_Ehdr read_elf_header(char *elfpath)
 {
 	Elf64_Ehdr eh;
-	Elf64_Shdr *sh_table, shstrtab;
-	Elf64_Off shoff;
 	FILE *elf_file;
-	int n_shdrs, idx_shstr, i, n;
-	char *section_strtab;
-	char *license;
 
-	elf_file = fopen("tracex2_kern.o", "r");
+	elf_file = fopen(elfpath, "r");
+	assert(!!elf_file);
+	assert(fread(&eh, sizeof(eh), 1, elf_file) == 1);
+	fclose(elf_file);
+	return eh;
+}
+
+/* Reads all section header tables into an Shdr array */
+Elf64_Shdr *read_section_headers_all(char *elfpath, int *entries)
+{
+	Elf64_Ehdr eh;
+	Elf64_Shdr *sh_table;
+	FILE *elf_file;
+
+	elf_file = fopen(elfpath, "r");
 	assert(!!elf_file);
 
-	/* Read ehdr */
-	assert(fread(&eh, sizeof(eh), 1, elf_file) == 1);
+	eh = read_elf_header(elfpath);
 
 	/* Read offset of shdr table */
 	assert(fseek(elf_file, eh.e_shoff, SEEK_SET) == 0);
-	printf("\nSection Header offset\t= 0x%08lx\n", eh.e_shoff);
 
 	/* Read shdr table */
-	n_shdrs = eh.e_shnum;
-	sh_table = (Elf64_Shdr *)malloc(sizeof(*sh_table) * n_shdrs);
+	sh_table = (Elf64_Shdr *)malloc(sizeof(*sh_table) * eh.e_shnum);
 	assert(fseek(elf_file, eh.e_shoff, SEEK_SET) == 0);
 	assert(fread((void *)sh_table, eh.e_shentsize, eh.e_shnum, elf_file)
 			== eh.e_shnum);
 
-	/* Read section header of section header string table */
-	idx_shstr = eh.e_shstrndx;
-	shstrtab = sh_table[idx_shstr];
-	assert(shstrtab.sh_type == SHT_STRTAB);
+	fclose(elf_file);
 
-	/* Read section header string table */
-	section_strtab = (char *)malloc(shstrtab.sh_size);
-	assert(fseek(elf_file, shstrtab.sh_offset, SEEK_SET) == 0);
-	assert(fread(section_strtab, shstrtab.sh_size, 1, elf_file) == 1);
+	*entries = eh.e_shentsize;
+	return sh_table;
+}
 
-	/* Find license */
-	for(int i = 0; i < eh.e_shnum; i++) {
-		char *secname = section_strtab + sh_table[i].sh_name;
+/* Read a section by its index - for ex to get sec hdr strtab blob */
+void *read_section_by_id(char *elfpath, int id, int *bytes)
+{
+	Elf64_Shdr *sh_table;
+	Elf64_Off shoff;
+	int entries;
+	FILE *elf_file;
+	char *section;
+
+	elf_file = fopen(elfpath, "r");
+	assert(!!elf_file);
+
+	sh_table = read_section_headers_all(elfpath, &entries);
+
+	section = (char *)malloc(sh_table[id].sh_size);
+	assert(fseek(elf_file, sh_table[id].sh_offset, SEEK_SET) == 0);
+	assert(fread(section, sh_table[id].sh_size, 1, elf_file) == 1);
+	*bytes = sh_table[id].sh_size;
+
+	free(sh_table);
+	fclose(elf_file);
+
+	return (void *)section;
+}
+
+/* Read whole section header string table */
+char *read_section_header_strtab(char *elfpath, int *bytes)
+{
+	Elf64_Ehdr eh;
+	FILE *elf_file;
+	char *strtab;
+
+	elf_file = fopen(elfpath, "r");
+	assert(!!elf_file);
+
+	eh = read_elf_header(elfpath);
+	strtab = (char *)read_section_by_id(elfpath, eh.e_shstrndx, bytes);
+
+	fclose(elf_file);
+	return strtab;
+}
+
+/* Reads a full section by name - example to get the GPL license */
+void *read_section_by_name(char *name, char *elfpath, int *bytes)
+{
+	char *sec_strtab;
+	char *data = NULL;
+	int n_sh_table;
+	Elf64_Shdr *sh_table;
+	FILE *elf_file;
+
+	elf_file = fopen(elfpath, "r");
+	assert(!!elf_file);
+	sh_table = read_section_headers_all(elfpath, &n_sh_table);
+	sec_strtab = read_section_header_strtab(elfpath, bytes);
+
+	for(int i = 0; i < n_sh_table; i++) {
+		char *secname = sec_strtab + sh_table[i].sh_name;
 		if (!secname)
 			continue;
 
-		if (!strcmp(secname, "license")) {
-			license = (char *)malloc(sh_table[i].sh_size);
+		if (!strcmp(secname, name)) {
+			data = (char *)malloc(sh_table[i].sh_size);
 			assert(fseek(elf_file, sh_table[i].sh_offset, SEEK_SET) == 0);
-			assert(fread(license, sh_table[i].sh_size, 1, elf_file) == 1);
-			printf("License found: %s\n", license);
+			assert(fread(data, sh_table[i].sh_size, 1, elf_file) == 1);
+			*bytes = sh_table[i].sh_size;
+			goto done;
 		}
 	}
 
-	/*
-	for(int i = 0; i < eh.e_shnum; i++)
-		printf("sh %d: off: %lx nameid:%s \n", i, sh_table[i].sh_offset,
-				section_strtab + sh_table[i].sh_name);
-	*/
+done:
+	free(sh_table);
+	free(sec_strtab);
+	fclose(elf_file);
+	return data;
+}
 
+int main()
+{
+	char *license;
+	char elfpath[] = "tracex2_kern.o";
+	int bytes;
+
+	license = read_section_by_name("license", elfpath, &bytes);
+	printf("License: %s\n", license);
 	return 0;
 }
 
