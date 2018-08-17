@@ -31,6 +31,16 @@ struct code_section {
 	struct code_section *next;
 };
 
+struct bpf_load_map_def {
+	unsigned int type;
+	unsigned int key_size;
+	unsigned int value_size;
+	unsigned int max_entries;
+	unsigned int map_flags;
+	unsigned int inner_map_idx;
+	unsigned int numa_node;
+};
+
 Elf64_Ehdr read_elf64_header(char *elfpath)
 {
 	Elf64_Ehdr eh;
@@ -112,8 +122,8 @@ char *read_section64_header_strtab(char *elfpath, int *bytes)
 	return strtab;
 }
 
-/* Get name from ID */
-char *get_section64_name_from_nameoff(char *elfpath, int name_off)
+/* Get name from offset in strtab */
+char *get_sym64_name(char *elfpath, int name_off)
 {
 	char *sec_strtab, *name, *ret;
 	int bytes;
@@ -166,6 +176,55 @@ done:
 	return data;
 }
 
+void *read_section64_by_type(char *elfpath, int type, int *bytes)
+{
+	char *data = NULL;
+	int n_sh_table;
+	Elf64_Shdr *sh_table;
+	FILE *elf_file;
+
+	elf_file = fopen(elfpath, "r");
+	assert(!!elf_file);
+	sh_table = read_section64_headers_all(elfpath, &n_sh_table);
+
+	for(int i = 0; i < n_sh_table; i++) {
+		if (sh_table[i].sh_type != type)
+			continue;
+
+		data = (char *)malloc(sh_table[i].sh_size);
+		assert(fseek(elf_file, sh_table[i].sh_offset, SEEK_SET) == 0);
+		assert(fread(data, sh_table[i].sh_size, 1, elf_file) == 1);
+		*bytes = sh_table[i].sh_size;
+		break;
+	}
+
+	free(sh_table);
+	fclose(elf_file);
+	return data;
+}
+
+int sym64_compare(const void *a1, const void *b1)
+{
+	Elf64_Sym *a, *b;
+
+	a = (Elf64_Sym *)a1;
+	b = (Elf64_Sym *)b1;
+
+	return (a->st_value - b->st_value);
+}
+
+Elf64_Sym *read_sym64_tab(char *elfpath, int *bytes)
+{
+	Elf64_Sym *data;
+
+	data = read_section64_by_type(elfpath, SHT_SYMTAB, bytes);
+	if (!data)
+		return data;
+
+	qsort(data, *bytes / sizeof(*data), sizeof(*data), sym64_compare);
+	return data;
+}
+
 int _startswith(const char *a, const char *b)
 {
    if(strncmp(a, b, strlen(b)) == 0) return 1;
@@ -182,7 +241,7 @@ struct code_section *read_code_sections(char *elfpath)
 	sh_table = read_section64_headers_all(elfpath, &entries);
 
 	for (int i = 0; i < entries; i++) {
-		char *name = get_section64_name_from_nameoff(elfpath, sh_table[i].sh_name);
+		char *name = get_sym64_name(elfpath, sh_table[i].sh_name);
 		int bytes;
 		struct code_section *cs = NULL;
 
@@ -202,7 +261,7 @@ struct code_section *read_code_sections(char *elfpath)
 		name = NULL;
 		/* Check for rel section */
 		if (cs && cs->data && i < entries - 1) {
-			name = get_section64_name_from_nameoff(elfpath, sh_table[i+1].sh_name);
+			name = get_sym64_name(elfpath, sh_table[i+1].sh_name);
 
 			if (name && (cs->type == KPROBE && _startswith(name, ".relkprobe/") ||
 						 cs->type == TRACEPOINT &&_startswith(name, ".reltracepoint/"))) {
@@ -234,19 +293,57 @@ void deslash(char *s)
 	}
 }
 
+char **get_map_names(char *elfpath, int *n)
+{
+	Elf64_Sym *symtab;
+	Elf64_Shdr *sh_table;
+	int bytes, entries, maps_idx = -1, nmaps = 0, j = 0;
+	char **names;
+
+	symtab = read_sym64_tab(elfpath, &bytes);
+
+	/* Get index of maps section */
+	sh_table = read_section64_headers_all(elfpath, &entries);
+	for (int i = 0; i < entries; i++) {
+		if (!strncmp(get_sym64_name(elfpath, sh_table[i].sh_name),
+					"maps", 4)) {
+			maps_idx = i;
+			break;
+		}
+	}
+	if (maps_idx == -1)
+		return NULL;
+
+	/* Count number of maps */
+	for (int i = 0; i < bytes / sizeof(*symtab); i++)
+		if (symtab[i].st_shndx == maps_idx)
+			nmaps++;
+
+	names = (char **)calloc(nmaps, sizeof(char *));
+	for (int i = 0; i < bytes / sizeof(*symtab); i++)
+		if (symtab[i].st_shndx == maps_idx)
+			names[j++] = get_sym64_name(elfpath, symtab[i].st_name);
+
+	*n = nmaps;
+	return names;
+}
+
 int main()
 {
 	char *license;
 	char elfpath[] = "tracex2_kern.o";
-	int bytes;
+	int bytes, n;
+	struct bpf_load_map_def *md;
 	struct code_section *cs;
+	Elf64_Sym *symtab;
+	char **map_names;
 
 	license = read_section64_by_name("license", elfpath, &bytes);
 	printf("License: %s\n", license);
 
-	/* dump all code and rel sections */
+	/* dump all code and rel sections
+	 *
 	cs = read_code_sections(elfpath);
-
 
 	while (cs) {
 		char fname[20];
@@ -269,7 +366,23 @@ int main()
 		cs = cs->next;
 	}
 
+	*
+ 	*/
+
+	md = read_section64_by_name("maps", elfpath, &bytes);
+
+	map_names = get_map_names(elfpath, &n);
+
+	for (int i = 0; i < n; i++)
+	{
+		printf("map %d is %s\n", i, map_names[i]);
+	}
+
 	return 0;
 }
+
+
+
+
 
 /* vim: set ts=4 sw=4: */
