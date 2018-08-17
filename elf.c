@@ -31,7 +31,7 @@ struct code_section {
 	struct code_section *next;
 };
 
-struct bpf_load_map_def {
+struct bpf_map_def {
 	unsigned int type;
 	unsigned int key_size;
 	unsigned int value_size;
@@ -333,7 +333,7 @@ int main()
 	char *license;
 	char elfpath[] = "tracex2_kern.o";
 	int bytes, n;
-	struct bpf_load_map_def *md;
+	struct bpf_map_def *md;
 	struct code_section *cs;
 	Elf64_Sym *symtab;
 	char **map_names;
