@@ -1,12 +1,14 @@
+#include <linux/bpf.h>
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <linux/bpf.h>
+#include <stdint.h>
 #include <linux/elf.h>
 #include <unistd.h>
 
-#define assert(cond) if (!cond) {						\
+#include "libbpf.h"
+#define assert(cond) if (!(cond)) {						\
 	char line[20];										\
 	if (errno == 0) errno = -1;							\
 	sprintf(line, "Error at function: %s line:%d file: %s", \
@@ -263,8 +265,8 @@ struct code_section *read_code_sections(char *elfpath)
 		if (cs && cs->data && i < entries - 1) {
 			name = get_sym64_name(elfpath, sh_table[i+1].sh_name);
 
-			if (name && (cs->type == KPROBE && _startswith(name, ".relkprobe/") ||
-						 cs->type == TRACEPOINT &&_startswith(name, ".reltracepoint/"))) {
+			if (name && ((cs->type == KPROBE && _startswith(name, ".relkprobe/"))||
+				     (cs->type == TRACEPOINT &&_startswith(name, ".reltracepoint/")))) {
 				cs->rel_data = read_section64_by_id(elfpath, i+1, &bytes);
 				cs->rel_data_len = bytes;
 			}
@@ -328,21 +330,49 @@ char **get_map_names(char *elfpath, int *n)
 	return names;
 }
 
+int *create_maps(char *elfpath, int *n)
+{
+	int bytes, *map_fds;
+	struct bpf_map_def *md = NULL;
+	char **map_names = NULL;
+
+	md = read_section64_by_name("maps", elfpath, &bytes);
+	if (!md)
+		return NULL;
+
+	map_names = get_map_names(elfpath, n);
+	if (!map_names)
+		return NULL;
+
+	map_fds = (int *)malloc(*n * sizeof(int));
+	assert(map_fds);
+
+	for (int i = 0; i < *n; i++)
+	{
+		int fd;
+		fd = bpf_create_map(md[i].type, map_names[i],
+				md[i].key_size, md[i].value_size,
+				md[i].max_entries, md[i].map_flags);
+		map_fds[i] = fd;
+		printf("map %d is %s with fd %d\n", i, map_names[i], fd);
+	}
+
+	free(map_names);
+	free(md);
+	return map_fds;
+}
 int main()
 {
 	char *license;
 	char elfpath[] = "tracex2_kern.o";
-	int bytes, n;
-	struct bpf_map_def *md;
 	struct code_section *cs;
-	Elf64_Sym *symtab;
-	char **map_names;
+	int n, bytes;
+	int *map_fds;
 
 	license = read_section64_by_name("license", elfpath, &bytes);
 	printf("License: %s\n", license);
 
-	/* dump all code and rel sections
-	 *
+	/* dump all code and rel sections */
 	cs = read_code_sections(elfpath);
 
 	while (cs) {
@@ -366,17 +396,11 @@ int main()
 		cs = cs->next;
 	}
 
-	*
- 	*/
-
-	md = read_section64_by_name("maps", elfpath, &bytes);
-
-	map_names = get_map_names(elfpath, &n);
+	map_fds = create_maps(elfpath, &n);
 
 	for (int i = 0; i < n; i++)
-	{
-		printf("map %d is %s\n", i, map_names[i]);
-	}
+		printf("fd: %d\n", map_fds[i]);
+
 
 	return 0;
 }
