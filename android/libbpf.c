@@ -1094,6 +1094,7 @@ int bpf_detach_tracepoint(const char *tp_category, const char *tp_name) {
   return 0;
 }
 
+/*
 int bpf_attach_raw_tracepoint(int progfd, char *tp_name)
 {
   union bpf_attr attr;
@@ -1108,6 +1109,7 @@ int bpf_attach_raw_tracepoint(int progfd, char *tp_name)
     fprintf(stderr, "bpf_attach_raw_tracepoint (%s): %s\n", tp_name, strerror(errno));
   return ret;
 }
+*/
 
 void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb,
                             perf_reader_lost_cb lost_cb, void *cb_cookie,

@@ -18,8 +18,6 @@
 #ifndef LIBBPF_H
 #define LIBBPF_H
 
-#include "compat/linux/bpf.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
