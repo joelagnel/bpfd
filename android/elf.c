@@ -215,7 +215,7 @@ int sym64_compare(const void *a1, const void *b1)
 	return (a->st_value - b->st_value);
 }
 
-Elf64_Sym *read_sym64_tab(char *elfpath, int *bytes)
+Elf64_Sym *read_sym64_tab(char *elfpath, int *bytes, int sort)
 {
 	Elf64_Sym *data;
 
@@ -223,7 +223,8 @@ Elf64_Sym *read_sym64_tab(char *elfpath, int *bytes)
 	if (!data)
 		return data;
 
-	qsort(data, *bytes / sizeof(*data), sizeof(*data), sym64_compare);
+	if (sort)
+		qsort(data, *bytes / sizeof(*data), sizeof(*data), sym64_compare);
 	return data;
 }
 
@@ -295,6 +296,23 @@ void deslash(char *s)
 	}
 }
 
+char *get_sym64_name_from_index(char *elfpath, int index)
+{
+	Elf64_Sym *symtab;
+	int bytes;
+	char *name;
+
+	symtab = read_sym64_tab(elfpath, &bytes, 0 /* !sort */);
+
+	if (index >= bytes / sizeof(*symtab))
+		return NULL;
+
+	name = get_sym64_name(elfpath, symtab[index].st_name);
+	free(symtab);
+
+	return name;
+}
+
 char **get_map_names(char *elfpath, int *n)
 {
 	Elf64_Sym *symtab;
@@ -302,7 +320,7 @@ char **get_map_names(char *elfpath, int *n)
 	int bytes, entries, maps_idx = -1, nmaps = 0, j = 0;
 	char **names;
 
-	symtab = read_sym64_tab(elfpath, &bytes);
+	symtab = read_sym64_tab(elfpath, &bytes, 1 /* sort */);
 
 	/* Get index of maps section */
 	sh_table = read_section64_headers_all(elfpath, &entries);
@@ -327,6 +345,8 @@ char **get_map_names(char *elfpath, int *n)
 			names[j++] = get_sym64_name(elfpath, symtab[i].st_name);
 
 	*n = nmaps;
+
+	free(symtab);
 	return names;
 }
 
@@ -361,12 +381,67 @@ int *create_maps(char *elfpath, int *n)
 	free(md);
 	return map_fds;
 }
+
+void apply_relo(struct bpf_insn *insns, Elf64_Addr offset, int fd)
+{
+	int insn_index;
+	struct bpf_insn *insn;
+
+	insn_index = offset / sizeof(struct bpf_insn);
+	insn = &insns[insn_index];
+
+	if (insn->code != (BPF_LD | BPF_IMM | BPF_DW)) {
+		printf("invalid relo for insn %d: code 0x%x\n",
+				insn_index, insn->code);
+		return;
+	}
+
+	insn->imm = fd;
+	insn->src_reg = BPF_PSEUDO_MAP_FD;
+}
+
+void apply_map_relocations(char *elfpath, int *map_fds, struct code_section *cs)
+{
+	int n_maps;
+	char **map_names;
+
+	map_names = get_map_names(elfpath, &n_maps);
+
+	while (cs) {
+		Elf64_Rel *rel = cs->rel_data;
+		int n_rel = cs->rel_data_len / sizeof(*rel);
+
+		for (int i = 0; i < n_rel; i++) {
+			int sym_index  = ELF64_R_SYM(rel[i].r_info);
+			char *sym_name = get_sym64_name_from_index(elfpath, sym_index);
+			if (!sym_name)
+				return;
+
+			/* Find the map fd and apply relo */
+			for (int j = 0; j < n_maps; j++) {
+				if (!strcmp(sym_name, map_names[j])) {
+
+					apply_relo(cs->data, rel[i].r_offset, map_fds[j]);
+					break;
+				}
+			}
+
+			if (sym_name)
+				free(sym_name);
+		}
+
+		cs = cs->next;
+	}
+
+	free(map_names);
+}
+
 int main()
 {
 	char *license;
 	char elfpath[] = "tracex2_kern.o";
 	struct code_section *cs;
-	int n, bytes;
+	int n_maps, bytes;
 	int *map_fds;
 
 	license = read_section64_by_name("license", elfpath, &bytes);
@@ -374,6 +449,13 @@ int main()
 
 	/* dump all code and rel sections */
 	cs = read_code_sections(elfpath);
+
+	map_fds = create_maps(elfpath, &n_maps);
+
+	for (int i = 0; i < n_maps; i++)
+		printf("fd: %d\n", map_fds[i]);
+
+	apply_map_relocations(elfpath, map_fds, cs);
 
 	while (cs) {
 		char fname[20];
@@ -395,12 +477,6 @@ int main()
 
 		cs = cs->next;
 	}
-
-	map_fds = create_maps(elfpath, &n);
-
-	for (int i = 0; i < n; i++)
-		printf("fd: %d\n", map_fds[i]);
-
 
 	return 0;
 }
