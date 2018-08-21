@@ -8,13 +8,65 @@
 #include <unistd.h>
 
 #include "libbpf.h"
-#define assert(cond) if (!(cond)) {						\
+#define assert_die(cond) if (!(cond)) {					\
 	char line[20];										\
 	if (errno == 0) errno = -1;							\
 	sprintf(line, "Error at function: %s line:%d file: %s", \
 			__func__, __LINE__, __FILE__);				\
 	perror(line); exit(0);								\
 }
+
+/*
+ * Check for errno, and if failure, then print perror
+ */
+#define assert_perror(str)			if (errno) {					\
+	char line[20];													\
+																	\
+	snprintf(line, 20, "Error %s", line);							\
+	perror(line);													\
+}
+
+/*
+ * Check for condition , and if failure, then print perror
+ */
+#define assert_cond_perror(cond, str) if (!cond) {					\
+	char line[20];													\
+																	\
+	if (errno == 0)													\
+		errno = -EINVAL;											\
+	snprintf(line, 20, "Error %s", str);									\
+	perror(line);													\
+}
+
+/*
+ * Check for condition , and if failure, then print perror and return
+ * errno
+ */
+#define assert_cond_perror_return(cond, str) if (!cond) {			\
+	char line[20];													\
+																	\
+	if (errno == 0)													\
+		errno = -EINVAL;											\
+	snprintf(line, 20, "Error %s", str);									\
+	perror(line);													\
+	return errno;													\
+}
+
+/*
+ * Check for condition , and if failure, then print perror and goto
+ * and store errno in a ret.
+ */
+#define assert_cond_perror_goto(cond, str, goto1) if (!cond) {	\
+	char line[20];													\
+																	\
+	if (errno == 0)													\
+		errno = -EINVAL;											\
+	ret = errno;													\
+	snprintf(line, 20, "Error %s", str);									\
+	perror(line);													\
+	goto goto1;														\
+}
+
 
 enum code_type {
 	TRACEPOINT,
@@ -43,166 +95,226 @@ struct bpf_map_def {
 	unsigned int numa_node;
 };
 
-Elf64_Ehdr read_elf64_header(char *elfpath)
+int read_elf64_header(char *elfpath, Elf64_Ehdr *eh)
 {
-	Elf64_Ehdr eh;
 	FILE *elf_file;
+	int ret;
 
 	elf_file = fopen(elfpath, "r");
-	assert(!!elf_file);
-	assert(fread(&eh, sizeof(eh), 1, elf_file) == 1);
+	assert_cond_perror_return(!!elf_file, "ELF file for header not found");
+
+	assert_cond_perror_goto((fread(eh, sizeof(*eh), 1, elf_file) == 1),
+						    "ELF header read failed", cleanup);
+cleanup:
 	fclose(elf_file);
-	return eh;
+	return 0;
 }
 
 /* Reads all section header tables into an Shdr array */
-Elf64_Shdr *read_section64_headers_all(char *elfpath, int *entries)
+int read_section64_headers_all(char *elfpath, int *entries, Elf64_Shdr **sh_table_ret)
 {
 	Elf64_Ehdr eh;
-	Elf64_Shdr *sh_table;
+	Elf64_Shdr *sh_table = NULL;
 	FILE *elf_file;
+	int ret = 0;
+
+	*sh_table_ret = NULL; *entries = 0;
 
 	elf_file = fopen(elfpath, "r");
-	assert(!!elf_file);
+	assert_cond_perror_return(!!elf_file, "ELF file for section header not found");
 
-	eh = read_elf64_header(elfpath);
+	ret = read_elf64_header(elfpath, &eh);
+	if (ret) goto cleanup;
 
 	/* Read offset of shdr table */
-	assert(fseek(elf_file, eh.e_shoff, SEEK_SET) == 0);
+	assert_cond_perror_goto((fseek(elf_file, eh.e_shoff, SEEK_SET) == 0),
+							  "ELF section header seek for offset failed", cleanup);
 
 	/* Read shdr table */
 	sh_table = (Elf64_Shdr *)malloc(sizeof(*sh_table) * eh.e_shnum);
-	assert(fseek(elf_file, eh.e_shoff, SEEK_SET) == 0);
-	assert(fread((void *)sh_table, eh.e_shentsize, eh.e_shnum, elf_file)
-			== eh.e_shnum);
+	if (!sh_table) { printf("Memory allocation failure\n"); ret = -ENOMEM; goto cleanup; }
 
-	fclose(elf_file);
+	assert_cond_perror_goto((fseek(elf_file, eh.e_shoff, SEEK_SET) == 0),
+							 "ELF section header seek for table failed", cleanup);
 
-	*entries = eh.e_shentsize;
-	return sh_table;
+	assert_cond_perror_goto((fread((void *)sh_table, eh.e_shentsize, eh.e_shnum, elf_file) == eh.e_shnum),
+							 "ELF section headers read failed", cleanup);
+
+
+	*entries = eh.e_shnum;
+	*sh_table_ret = sh_table;
+
+cleanup:
+	if (elf_file) fclose(elf_file);
+
+	if (ret && sh_table)
+		free(sh_table);
+
+	return ret;
 }
 
 /* Read a section by its index - for ex to get sec hdr strtab blob */
-void *read_section64_by_id(char *elfpath, int id, int *bytes)
+int read_section64_by_id(char *elfpath, int id, int *bytes, void **section)
 {
 	Elf64_Shdr *sh_table;
 	Elf64_Off shoff;
-	int entries;
+	int entries, ret = 0;
 	FILE *elf_file;
-	char *section;
+	char *sec;
+
+	*section = NULL; *bytes = 0;
 
 	elf_file = fopen(elfpath, "r");
-	assert(!!elf_file);
+	assert_cond_perror_return(!!elf_file, "ELF file for section id not found");
 
-	sh_table = read_section64_headers_all(elfpath, &entries);
+	ret = read_section64_headers_all(elfpath, &entries, &sh_table);
+	if (ret) goto cleanup;
 
-	section = (char *)malloc(sh_table[id].sh_size);
-	assert(fseek(elf_file, sh_table[id].sh_offset, SEEK_SET) == 0);
-	assert(fread(section, sh_table[id].sh_size, 1, elf_file) == 1);
+	sec = (char *)malloc(sh_table[id].sh_size);
+	if (!sec) { printf("Memory allocation failure\n"); ret = -ENOMEM; goto cleanup; }
+
+	assert_cond_perror_goto(fseek(elf_file, sh_table[id].sh_offset, SEEK_SET) == 0,
+							"ELF section id seek failed", cleanup);
+
+	assert_cond_perror_goto(fread(sec, sh_table[id].sh_size, 1, elf_file) == 1,
+							"ELF section id read failed", cleanup);
+
 	*bytes = sh_table[id].sh_size;
+	*section = sec;
 
-	free(sh_table);
-	fclose(elf_file);
+cleanup:
+	if (elf_file) fclose(elf_file);
 
-	return (void *)section;
+	if (sh_table) free(sh_table);
+
+	if (ret && sec) free(sec);
+
+	return ret;
 }
 
 /* Read whole section header string table */
-char *read_section64_header_strtab(char *elfpath, int *bytes)
+int read_section64_header_strtab(char *elfpath, int *bytes, char **strtabp)
 {
 	Elf64_Ehdr eh;
 	FILE *elf_file;
-	char *strtab;
+	char *strtab = NULL;
+	int ret = 0;
 
 	elf_file = fopen(elfpath, "r");
-	assert(!!elf_file);
+	if (!elf_file) goto cleanup;
 
-	eh = read_elf64_header(elfpath);
-	strtab = (char *)read_section64_by_id(elfpath, eh.e_shstrndx, bytes);
+	ret = read_elf64_header(elfpath, &eh);
+	if (ret) goto cleanup;
 
-	fclose(elf_file);
-	return strtab;
+	ret = read_section64_by_id(elfpath, eh.e_shstrndx, bytes, (void **)&strtab);
+	if (ret) goto cleanup;
+
+cleanup:
+	if (elf_file) fclose(elf_file);
+
+	*strtabp = strtab;
+	return ret;
 }
 
 /* Get name from offset in strtab */
-char *get_sym64_name(char *elfpath, int name_off)
+int get_sym64_name(char *elfpath, int name_off, char **name_ret)
 {
-	char *sec_strtab, *name, *ret;
-	int bytes;
+	char *sec_strtab = NULL, *name, *name2;
+	int bytes, ret = 0;
 
-	sec_strtab = read_section64_header_strtab(elfpath, &bytes);
+	ret = read_section64_header_strtab(elfpath, &bytes, &sec_strtab);
+	if (ret) return ret;
 
-	if (name_off >= bytes)
-		return NULL;
+	if (name_off >= bytes) { ret = -1; goto cleanup; }
 
 	name = sec_strtab + name_off;
-	ret = (char *)malloc(strlen(name) + 1);
-	memcpy(ret, name, strlen(name) + 1);
-
-	free(sec_strtab);
+	name2 = (char *)malloc(strlen(name) + 1);
+	memcpy(name2, name, strlen(name) + 1);
+	*name_ret = name2;
+cleanup:
+	if (sec_strtab)
+		free(sec_strtab);
 	return ret;
 }
 
 /* Reads a full section by name - example to get the GPL license */
-void *read_section64_by_name(char *name, char *elfpath, int *bytes)
+int read_section64_by_name(char *name, char *elfpath, int *bytes, void **ptr)
 {
 	char *sec_strtab;
 	char *data = NULL;
-	int n_sh_table;
+	int n_sh_table, ret = 0;
 	Elf64_Shdr *sh_table;
 	FILE *elf_file;
 
 	elf_file = fopen(elfpath, "r");
-	assert(!!elf_file);
-	sh_table = read_section64_headers_all(elfpath, &n_sh_table);
-	sec_strtab = read_section64_header_strtab(elfpath, bytes);
+	if (!elf_file) return -1;
+
+	ret = read_section64_headers_all(elfpath, &n_sh_table, &sh_table);
+	if (ret) goto done;
+
+	ret = read_section64_header_strtab(elfpath, bytes, &sec_strtab);
+	if (ret) goto done;
 
 	for(int i = 0; i < n_sh_table; i++) {
 		char *secname = sec_strtab + sh_table[i].sh_name;
-		if (!secname)
-			continue;
+		if (!secname) continue;
 
 		if (!strcmp(secname, name)) {
 			data = (char *)malloc(sh_table[i].sh_size);
-			assert(fseek(elf_file, sh_table[i].sh_offset, SEEK_SET) == 0);
-			assert(fread(data, sh_table[i].sh_size, 1, elf_file) == 1);
+			if (fseek(elf_file, sh_table[i].sh_offset, SEEK_SET) != 0) {
+				ret = -1; goto done;
+			}
+
+			if (fread(data, sh_table[i].sh_size, 1, elf_file) != 1) {
+				ret = -1; goto done;
+			}
 			*bytes = sh_table[i].sh_size;
+			*ptr = data;
 			goto done;
 		}
 	}
-
 done:
-	free(sh_table);
-	free(sec_strtab);
-	fclose(elf_file);
-	return data;
+	if (ret && data) free(data);
+	if (sh_table) free(sh_table);
+	if (sec_strtab) free(sec_strtab);
+	if (elf_file) fclose(elf_file);
+	return ret;
 }
 
-void *read_section64_by_type(char *elfpath, int type, int *bytes)
+int read_section64_by_type(char *elfpath, int type, int *bytes, void **ptr)
 {
 	char *data = NULL;
-	int n_sh_table;
-	Elf64_Shdr *sh_table;
+	int n_sh_table, ret = 0;
+	Elf64_Shdr *sh_table = NULL;
 	FILE *elf_file;
 
 	elf_file = fopen(elfpath, "r");
-	assert(!!elf_file);
-	sh_table = read_section64_headers_all(elfpath, &n_sh_table);
+	if (!elf_file) { return -1; }
+
+	ret = read_section64_headers_all(elfpath, &n_sh_table, &sh_table);
+	if (ret) goto done;
 
 	for(int i = 0; i < n_sh_table; i++) {
 		if (sh_table[i].sh_type != type)
 			continue;
 
 		data = (char *)malloc(sh_table[i].sh_size);
-		assert(fseek(elf_file, sh_table[i].sh_offset, SEEK_SET) == 0);
-		assert(fread(data, sh_table[i].sh_size, 1, elf_file) == 1);
+		if (fseek(elf_file, sh_table[i].sh_offset, SEEK_SET) != 0) {
+			ret = -1; goto done;
+		}
+		if (fread(data, sh_table[i].sh_size, 1, elf_file) != 1) {
+			ret = -1; goto done;
+		}
 		*bytes = sh_table[i].sh_size;
+		*ptr = data;
 		break;
 	}
 
-	free(sh_table);
-	fclose(elf_file);
-	return data;
+done:
+	if (ret && data) free(data);
+	if (sh_table) free(sh_table);
+	if (elf_file) fclose(elf_file);
+	return ret;
 }
 
 int sym64_compare(const void *a1, const void *b1)
@@ -215,47 +327,53 @@ int sym64_compare(const void *a1, const void *b1)
 	return (a->st_value - b->st_value);
 }
 
-Elf64_Sym *read_sym64_tab(char *elfpath, int *bytes, int sort)
+int read_sym64_tab(char *elfpath, int *bytes, int sort, Elf64_Sym **ptr)
 {
 	Elf64_Sym *data;
+	int ret;
 
-	data = read_section64_by_type(elfpath, SHT_SYMTAB, bytes);
-	if (!data)
-		return data;
+	ret = read_section64_by_type(elfpath, SHT_SYMTAB, bytes, (void *)&data);
+	if (ret) return ret;
 
 	if (sort)
 		qsort(data, *bytes / sizeof(*data), sizeof(*data), sym64_compare);
-	return data;
+
+	*ptr = data;
+	return ret;
 }
 
 int _startswith(const char *a, const char *b)
 {
-   if(strncmp(a, b, strlen(b)) == 0) return 1;
+   if (strncmp(a, b, strlen(b)) == 0) return 1;
    return 0;
 }
 
 /* Read a section by its index - for ex to get sec hdr strtab blob */
-struct code_section *read_code_sections(char *elfpath)
+int read_code_sections(char *elfpath, struct code_section **cs_ptr)
 {
 	Elf64_Shdr *sh_table;
-	int entries;
+	int entries, ret = 0;
 	struct code_section *cs_ret = NULL;
 
-	sh_table = read_section64_headers_all(elfpath, &entries);
+	ret = read_section64_headers_all(elfpath, &entries, &sh_table);
+	if (ret) return ret;
 
 	for (int i = 0; i < entries; i++) {
-		char *name = get_sym64_name(elfpath, sh_table[i].sh_name);
+		char *name;
 		int bytes;
 		struct code_section *cs = NULL;
 
+		ret = get_sym64_name(elfpath, sh_table[i].sh_name, &name);
+		if (ret) goto done;
+
 		if (name && (_startswith(name, "kprobe/") ||
-					 _startswith(name, "tracepoint/"))) {
+			     _startswith(name, "tracepoint/"))) {
 
 			cs = (struct code_section *)calloc(1, sizeof(*cs));
-
 			cs->type = (_startswith(name, "kprobe/")) ? KPROBE : TRACEPOINT;
 			cs->name = name;
-			cs->data = read_section64_by_id(elfpath, i, &bytes);
+			ret = read_section64_by_id(elfpath, i, &bytes, &cs->data);
+			if (ret) goto done;
 			cs->data_len = bytes;
 		} else if (name) {
 			free(name);
@@ -263,12 +381,14 @@ struct code_section *read_code_sections(char *elfpath)
 
 		name = NULL;
 		/* Check for rel section */
-		if (cs && cs->data && i < entries - 1) {
-			name = get_sym64_name(elfpath, sh_table[i+1].sh_name);
+		if (cs && cs->data && i < entries) {
+			ret = get_sym64_name(elfpath, sh_table[i+1].sh_name, &name);
+			if (ret) goto done;
 
 			if (name && ((cs->type == KPROBE && _startswith(name, ".relkprobe/"))||
 				     (cs->type == TRACEPOINT &&_startswith(name, ".reltracepoint/")))) {
-				cs->rel_data = read_section64_by_id(elfpath, i+1, &bytes);
+				ret = read_section64_by_id(elfpath, i+1, &bytes, &cs->rel_data);
+				if (ret) goto done;
 				cs->rel_data_len = bytes;
 			}
 		} else if (name) {
@@ -281,8 +401,21 @@ struct code_section *read_code_sections(char *elfpath)
 		}
 	}
 
-	free(sh_table);
-	return cs_ret;
+	*cs_ptr = cs_ret;
+done:
+	/* unallocate on errors */
+	if (ret && cs_ret) {
+		while(cs_ret) {
+			struct code_section *cs;
+			if (cs_ret->name) free(cs_ret->name);
+			if (cs_ret->data) free(cs_ret->data);
+			cs = cs_ret;
+			cs_ret = cs_ret->next;
+			free(cs);
+		}
+	}
+	if (sh_table) free(sh_table);
+	return ret;
 }
 
 void deslash(char *s)
@@ -296,43 +429,54 @@ void deslash(char *s)
 	}
 }
 
-char *get_sym64_name_from_index(char *elfpath, int index)
+int get_sym64_name_from_index(char *elfpath, int index, char **name_ret)
 {
 	Elf64_Sym *symtab;
-	int bytes;
-	char *name;
+	int bytes, ret = 0;
+	char *name = NULL;
 
-	symtab = read_sym64_tab(elfpath, &bytes, 0 /* !sort */);
+	ret = read_sym64_tab(elfpath, &bytes, 0 /* !sort */, &symtab);
+	if (ret) goto cleanup;
 
-	if (index >= bytes / sizeof(*symtab))
-		return NULL;
+	if (index >= bytes / sizeof(*symtab)) { ret = -1; goto cleanup; }
 
-	name = get_sym64_name(elfpath, symtab[index].st_name);
-	free(symtab);
+	ret = get_sym64_name(elfpath, symtab[index].st_name, &name);
+	if (ret) goto cleanup;
 
-	return name;
+	*name_ret = name;
+cleanup:
+	if (symtab) free(symtab);
+	return ret;
 }
 
-char **get_map_names(char *elfpath, int *n)
+int get_map_names(char *elfpath, int *n, char ***map_names_ptr)
 {
-	Elf64_Sym *symtab;
-	Elf64_Shdr *sh_table;
-	int bytes, entries, maps_idx = -1, nmaps = 0, j = 0;
+	Elf64_Sym *symtab = NULL;
+	Elf64_Shdr *sh_table = NULL;
+	int bytes, entries, maps_idx = -1, nmaps = 0, j = 0, ret = 0;
 	char **names;
+	char *map_name = NULL;
 
-	symtab = read_sym64_tab(elfpath, &bytes, 1 /* sort */);
+	ret = read_sym64_tab(elfpath, &bytes, 1 /* sort */, &symtab);
+	if (ret) goto cleanup;
 
 	/* Get index of maps section */
-	sh_table = read_section64_headers_all(elfpath, &entries);
+	ret = read_section64_headers_all(elfpath, &entries, &sh_table);
+	if (ret) goto cleanup;
+
 	for (int i = 0; i < entries; i++) {
-		if (!strncmp(get_sym64_name(elfpath, sh_table[i].sh_name),
-					"maps", 4)) {
+		ret = get_sym64_name(elfpath, sh_table[i].sh_name, &map_name);
+		if (ret) goto cleanup;
+
+		if (!strncmp(map_name, "maps", 4)) {
 			maps_idx = i;
+			free(map_name);
+			map_name = NULL;
 			break;
 		}
+		if (map_name) { free(map_name); map_name = NULL; }
 	}
-	if (maps_idx == -1)
-		return NULL;
+	if (maps_idx == -1) goto cleanup;
 
 	/* Count number of maps */
 	for (int i = 0; i < bytes / sizeof(*symtab); i++)
@@ -340,34 +484,45 @@ char **get_map_names(char *elfpath, int *n)
 			nmaps++;
 
 	names = (char **)calloc(nmaps, sizeof(char *));
-	for (int i = 0; i < bytes / sizeof(*symtab); i++)
-		if (symtab[i].st_shndx == maps_idx)
-			names[j++] = get_sym64_name(elfpath, symtab[i].st_name);
+	if (!names) { ret = -ENOMEM; goto cleanup; }
+
+	for (int i = 0; i < bytes / sizeof(*symtab); i++) {
+		if (symtab[i].st_shndx == maps_idx) {
+			ret = get_sym64_name(elfpath, symtab[i].st_name, &names[j++]);
+			if (ret) {
+				// cleanup all old allocations
+				for (int k = 0; k < j; k++)
+					if (names[k]) free(names[k]);
+				goto cleanup;
+			}
+		}
+	}
 
 	*n = nmaps;
-
-	free(symtab);
-	return names;
+	*map_names_ptr = names;
+cleanup:
+	if (symtab) free(symtab);
+	if (sh_table) free(sh_table);
+	if (map_name) free(map_name);
+	return ret;
 }
 
-int *create_maps(char *elfpath, int *n)
+int create_maps(char *elfpath, int *n, int **map_ret)
 {
-	int bytes, *map_fds;
+	int bytes, *map_fds = NULL, ret = 0, nmaps;
 	struct bpf_map_def *md = NULL;
 	char **map_names = NULL;
 
-	md = read_section64_by_name("maps", elfpath, &bytes);
-	if (!md)
-		return NULL;
+	ret = read_section64_by_name("maps", elfpath, &bytes, (void *)&md);
+	if (ret) goto cleanup;
 
-	map_names = get_map_names(elfpath, n);
-	if (!map_names)
-		return NULL;
+	ret = get_map_names(elfpath, &nmaps, &map_names);
+	if (ret) goto cleanup;
 
 	map_fds = (int *)malloc(*n * sizeof(int));
-	assert(map_fds);
+	if (!map_fds) { ret = -ENOMEM; goto cleanup; }
 
-	for (int i = 0; i < *n; i++)
+	for (int i = 0; i < nmaps; i++)
 	{
 		int fd;
 		fd = bpf_create_map(md[i].type, map_names[i],
@@ -377,9 +532,12 @@ int *create_maps(char *elfpath, int *n)
 		printf("map %d is %s with fd %d\n", i, map_names[i], fd);
 	}
 
-	free(map_names);
-	free(md);
-	return map_fds;
+	*n = nmaps;
+	*map_ret = map_fds;
+cleanup:
+	if (map_names) free(map_names);
+	if (md) free(md);
+	return ret;
 }
 
 void apply_relo(struct bpf_insn *insns, Elf64_Addr offset, int fd)
@@ -402,10 +560,11 @@ void apply_relo(struct bpf_insn *insns, Elf64_Addr offset, int fd)
 
 void apply_map_relocations(char *elfpath, int *map_fds, struct code_section *cs)
 {
-	int n_maps;
-	char **map_names;
+	int n_maps, ret;
+	char **map_names = NULL;
 
-	map_names = get_map_names(elfpath, &n_maps);
+	ret = get_map_names(elfpath, &n_maps, &map_names);
+	if (ret) goto cleanup;
 
 	while (cs) {
 		Elf64_Rel *rel = cs->rel_data;
@@ -413,27 +572,29 @@ void apply_map_relocations(char *elfpath, int *map_fds, struct code_section *cs)
 
 		for (int i = 0; i < n_rel; i++) {
 			int sym_index  = ELF64_R_SYM(rel[i].r_info);
-			char *sym_name = get_sym64_name_from_index(elfpath, sym_index);
-			if (!sym_name)
-				return;
+			char *sym_name;
+
+			ret = get_sym64_name_from_index(elfpath, sym_index, &sym_name);
+			if (ret) {
+				if (sym_name) free(sym_name);
+				goto cleanup;
+			}
 
 			/* Find the map fd and apply relo */
 			for (int j = 0; j < n_maps; j++) {
 				if (!strcmp(sym_name, map_names[j])) {
-
 					apply_relo(cs->data, rel[i].r_offset, map_fds[j]);
 					break;
 				}
 			}
 
-			if (sym_name)
-				free(sym_name);
+			if (sym_name) free(sym_name);
 		}
 
 		cs = cs->next;
 	}
-
-	free(map_names);
+cleanup:
+	if (map_names) free(map_names);
 }
 
 int main()
@@ -442,15 +603,21 @@ int main()
 	char elfpath[] = "tracex2_kern.o";
 	struct code_section *cs;
 	int n_maps, bytes;
-	int *map_fds;
+	int *map_fds, ret;
 
-	license = read_section64_by_name("license", elfpath, &bytes);
-	printf("License: %s\n", license);
+	ret = read_section64_by_name("license", elfpath, &bytes, (void **)&license);
+	if (ret)
+		printf("couldn't find license\n");
+	else
+		printf("License: %s\n", license);
 
 	/* dump all code and rel sections */
-	cs = read_code_sections(elfpath);
+	ret = read_code_sections(elfpath, &cs);
+	if (ret) printf("couldn't read cs\n");
 
-	map_fds = create_maps(elfpath, &n_maps);
+	ret = create_maps(elfpath, &n_maps, &map_fds);
+	if (ret)
+		printf("failed to create maps\n");
 
 	for (int i = 0; i < n_maps; i++)
 		printf("fd: %d\n", map_fds[i]);
@@ -480,9 +647,3 @@ int main()
 
 	return 0;
 }
-
-
-
-
-
-/* vim: set ts=4 sw=4: */
