@@ -8,65 +8,6 @@
 #include <unistd.h>
 
 #include "libbpf.h"
-#define assert_die(cond) if (!(cond)) {					\
-	char line[20];										\
-	if (errno == 0) errno = -1;							\
-	sprintf(line, "Error at function: %s line:%d file: %s", \
-			__func__, __LINE__, __FILE__);				\
-	perror(line); exit(0);								\
-}
-
-/*
- * Check for errno, and if failure, then print perror
- */
-#define assert_perror(str)			if (errno) {					\
-	char line[20];													\
-																	\
-	snprintf(line, 20, "Error %s", line);							\
-	perror(line);													\
-}
-
-/*
- * Check for condition , and if failure, then print perror
- */
-#define assert_cond_perror(cond, str) if (!cond) {					\
-	char line[20];													\
-																	\
-	if (errno == 0)													\
-		errno = -EINVAL;											\
-	snprintf(line, 20, "Error %s", str);									\
-	perror(line);													\
-}
-
-/*
- * Check for condition , and if failure, then print perror and return
- * errno
- */
-#define assert_cond_perror_return(cond, str) if (!cond) {			\
-	char line[20];													\
-																	\
-	if (errno == 0)													\
-		errno = -EINVAL;											\
-	snprintf(line, 20, "Error %s", str);									\
-	perror(line);													\
-	return errno;													\
-}
-
-/*
- * Check for condition , and if failure, then print perror and goto
- * and store errno in a ret.
- */
-#define assert_cond_perror_goto(cond, str, goto1) if (!cond) {	\
-	char line[20];													\
-																	\
-	if (errno == 0)													\
-		errno = -EINVAL;											\
-	ret = errno;													\
-	snprintf(line, 20, "Error %s", str);									\
-	perror(line);													\
-	goto goto1;														\
-}
-
 
 enum code_type {
 	TRACEPOINT,
@@ -98,16 +39,16 @@ struct bpf_map_def {
 int read_elf64_header(char *elfpath, Elf64_Ehdr *eh)
 {
 	FILE *elf_file;
-	int ret;
+	int ret = 0;
 
 	elf_file = fopen(elfpath, "r");
-	assert_cond_perror_return(!!elf_file, "ELF file for header not found");
+	if (!elf_file) return -1;
 
-	assert_cond_perror_goto((fread(eh, sizeof(*eh), 1, elf_file) == 1),
-						    "ELF header read failed", cleanup);
+	if (fread(eh, sizeof(*eh), 1, elf_file) != 1)
+		ret = -1;
 cleanup:
-	fclose(elf_file);
-	return 0;
+	if (elf_file) fclose(elf_file);
+	return ret;
 }
 
 /* Reads all section header tables into an Shdr array */
@@ -121,34 +62,37 @@ int read_section64_headers_all(char *elfpath, int *entries, Elf64_Shdr **sh_tabl
 	*sh_table_ret = NULL; *entries = 0;
 
 	elf_file = fopen(elfpath, "r");
-	assert_cond_perror_return(!!elf_file, "ELF file for section header not found");
+	if (!elf_file) return -1;
 
 	ret = read_elf64_header(elfpath, &eh);
 	if (ret) goto cleanup;
 
 	/* Read offset of shdr table */
-	assert_cond_perror_goto((fseek(elf_file, eh.e_shoff, SEEK_SET) == 0),
-							  "ELF section header seek for offset failed", cleanup);
+	if (fseek(elf_file, eh.e_shoff, SEEK_SET) != 0) {
+		ret = -1;
+		goto cleanup;
+	}
 
 	/* Read shdr table */
 	sh_table = (Elf64_Shdr *)malloc(sizeof(*sh_table) * eh.e_shnum);
-	if (!sh_table) { printf("Memory allocation failure\n"); ret = -ENOMEM; goto cleanup; }
+	if (!sh_table) { 
+		ret = -ENOMEM; goto cleanup;
+	}
 
-	assert_cond_perror_goto((fseek(elf_file, eh.e_shoff, SEEK_SET) == 0),
-							 "ELF section header seek for table failed", cleanup);
+	if (fseek(elf_file, eh.e_shoff, SEEK_SET) != 0) {
+		ret = -1; goto cleanup;
+	}
 
-	assert_cond_perror_goto((fread((void *)sh_table, eh.e_shentsize, eh.e_shnum, elf_file) == eh.e_shnum),
-							 "ELF section headers read failed", cleanup);
-
+	if (fread((void *)sh_table, eh.e_shentsize, eh.e_shnum, elf_file) != eh.e_shnum) {
+		ret = -1; goto cleanup;
+	}
 
 	*entries = eh.e_shnum;
 	*sh_table_ret = sh_table;
 
 cleanup:
 	if (elf_file) fclose(elf_file);
-
-	if (ret && sh_table)
-		free(sh_table);
+	if (ret && sh_table) free(sh_table);
 
 	return ret;
 }
@@ -165,7 +109,7 @@ int read_section64_by_id(char *elfpath, int id, int *bytes, void **section)
 	*section = NULL; *bytes = 0;
 
 	elf_file = fopen(elfpath, "r");
-	assert_cond_perror_return(!!elf_file, "ELF file for section id not found");
+	if (!elf_file) return -1;
 
 	ret = read_section64_headers_all(elfpath, &entries, &sh_table);
 	if (ret) goto cleanup;
@@ -173,22 +117,19 @@ int read_section64_by_id(char *elfpath, int id, int *bytes, void **section)
 	sec = (char *)malloc(sh_table[id].sh_size);
 	if (!sec) { printf("Memory allocation failure\n"); ret = -ENOMEM; goto cleanup; }
 
-	assert_cond_perror_goto(fseek(elf_file, sh_table[id].sh_offset, SEEK_SET) == 0,
-							"ELF section id seek failed", cleanup);
+	if (fseek(elf_file, sh_table[id].sh_offset, SEEK_SET) != 0)
+		goto cleanup;
 
-	assert_cond_perror_goto(fread(sec, sh_table[id].sh_size, 1, elf_file) == 1,
-							"ELF section id read failed", cleanup);
+	if (fread(sec, sh_table[id].sh_size, 1, elf_file) != 1)
+		goto cleanup;
 
 	*bytes = sh_table[id].sh_size;
 	*section = sec;
 
 cleanup:
 	if (elf_file) fclose(elf_file);
-
 	if (sh_table) free(sh_table);
-
 	if (ret && sec) free(sec);
-
 	return ret;
 }
 
