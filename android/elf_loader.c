@@ -556,6 +556,8 @@ int main()
 	ret = read_code_sections(elfpath, &cs);
 	if (ret) printf("couldn't read cs\n");
 
+	n_maps = 0;
+
 	ret = create_maps(elfpath, &n_maps, &map_fds);
 	if (ret)
 		printf("failed to create maps\n");
