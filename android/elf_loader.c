@@ -27,7 +27,7 @@ struct code_section {
 };
 
 struct bpf_map_def {
-	unsigned int type;
+	enum bpf_map_type type;
 	unsigned int key_size;
 	unsigned int value_size;
 	unsigned int max_entries;
@@ -36,7 +36,7 @@ struct bpf_map_def {
 	unsigned int numa_node;
 };
 
-int read_elf64_header(char *elfpath, Elf64_Ehdr *eh)
+int read_elf64_header(const char *elfpath, Elf64_Ehdr *eh)
 {
 	FILE *elf_file;
 	int ret = 0;
@@ -52,7 +52,7 @@ cleanup:
 }
 
 /* Reads all section header tables into an Shdr array */
-int read_section64_headers_all(char *elfpath, int *entries, Elf64_Shdr **sh_table_ret)
+int read_section64_headers_all(const char *elfpath, int *entries, Elf64_Shdr **sh_table_ret)
 {
 	Elf64_Ehdr eh;
 	Elf64_Shdr *sh_table = NULL;
@@ -98,7 +98,7 @@ cleanup:
 }
 
 /* Read a section by its index - for ex to get sec hdr strtab blob */
-int read_section64_by_id(char *elfpath, int id, int *bytes, void **section)
+int read_section64_by_id(const char *elfpath, int id, int *bytes, void **section)
 {
 	Elf64_Shdr *sh_table;
 	Elf64_Off shoff;
@@ -134,7 +134,7 @@ cleanup:
 }
 
 /* Read whole section header string table */
-int read_section64_header_strtab(char *elfpath, int *bytes, char **strtabp)
+int read_section64_header_strtab(const char *elfpath, int *bytes, char **strtabp)
 {
 	Elf64_Ehdr eh;
 	FILE *elf_file;
@@ -158,7 +158,7 @@ cleanup:
 }
 
 /* Get name from offset in strtab */
-int get_sym64_name(char *elfpath, int name_off, char **name_ret)
+int get_sym64_name(const char *elfpath, int name_off, char **name_ret)
 {
 	char *sec_strtab = NULL, *name, *name2;
 	int bytes, ret = 0;
@@ -179,7 +179,7 @@ cleanup:
 }
 
 /* Reads a full section by name - example to get the GPL license */
-int read_section64_by_name(char *name, char *elfpath, int *bytes, void **ptr)
+int read_section64_by_name(const char *name, const char *elfpath, int *bytes, void **ptr)
 {
 	char *sec_strtab;
 	char *data = NULL;
@@ -222,7 +222,7 @@ done:
 	return ret;
 }
 
-int read_section64_by_type(char *elfpath, int type, int *bytes, void **ptr)
+int read_section64_by_type(const char *elfpath, int type, int *bytes, void **ptr)
 {
 	char *data = NULL;
 	int n_sh_table, ret = 0;
@@ -268,12 +268,12 @@ int sym64_compare(const void *a1, const void *b1)
 	return (a->st_value - b->st_value);
 }
 
-int read_sym64_tab(char *elfpath, int *bytes, int sort, Elf64_Sym **ptr)
+int read_sym64_tab(const char *elfpath, int *bytes, int sort, Elf64_Sym **ptr)
 {
 	Elf64_Sym *data;
 	int ret;
 
-	ret = read_section64_by_type(elfpath, SHT_SYMTAB, bytes, (void *)&data);
+	ret = read_section64_by_type(elfpath, SHT_SYMTAB, bytes, (void **)&data);
 	if (ret) return ret;
 
 	if (sort)
@@ -290,7 +290,7 @@ int _startswith(const char *a, const char *b)
 }
 
 /* Read a section by its index - for ex to get sec hdr strtab blob */
-int read_code_sections(char *elfpath, struct code_section **cs_ptr)
+int read_code_sections(const char *elfpath, struct code_section **cs_ptr)
 {
 	Elf64_Shdr *sh_table;
 	int entries, ret = 0;
@@ -370,7 +370,7 @@ void deslash(char *s)
 	}
 }
 
-int get_sym64_name_from_index(char *elfpath, int index, char **name_ret)
+int get_sym64_name_from_index(const char *elfpath, int index, char **name_ret)
 {
 	Elf64_Sym *symtab;
 	int bytes, ret = 0;
@@ -390,7 +390,7 @@ cleanup:
 	return ret;
 }
 
-int get_map_names(char *elfpath, int *n, char ***map_names_ptr)
+int get_map_names(const char *elfpath, int *n, char ***map_names_ptr)
 {
 	Elf64_Sym *symtab = NULL;
 	Elf64_Shdr *sh_table = NULL;
@@ -448,13 +448,13 @@ cleanup:
 	return ret;
 }
 
-int create_maps(char *elfpath, int *n, int **map_ret)
+int create_maps(const char *elfpath, int *n, int **map_ret)
 {
 	int bytes, *map_fds = NULL, ret = 0, nmaps;
 	struct bpf_map_def *md = NULL;
 	char **map_names = NULL;
 
-	ret = read_section64_by_name("maps", elfpath, &bytes, (void *)&md);
+	ret = read_section64_by_name("maps", elfpath, &bytes, (void **)&md);
 	if (ret) goto cleanup;
 
 	ret = get_map_names(elfpath, &nmaps, &map_names);
@@ -481,10 +481,12 @@ cleanup:
 	return ret;
 }
 
-void apply_relo(struct bpf_insn *insns, Elf64_Addr offset, int fd)
+void apply_relo(void *insns_p, Elf64_Addr offset, int fd)
 {
 	int insn_index;
-	struct bpf_insn *insn;
+	struct bpf_insn *insn, *insns;
+
+	insns = (struct bpf_insn *)(insns_p);
 
 	insn_index = offset / sizeof(struct bpf_insn);
 	insn = &insns[insn_index];
@@ -499,7 +501,7 @@ void apply_relo(struct bpf_insn *insns, Elf64_Addr offset, int fd)
 	insn->src_reg = BPF_PSEUDO_MAP_FD;
 }
 
-void apply_map_relocations(char *elfpath, int *map_fds, struct code_section *cs)
+void apply_map_relocations(const char *elfpath, int *map_fds, struct code_section *cs)
 {
 	int n_maps, ret;
 	char **map_names = NULL;
@@ -508,7 +510,7 @@ void apply_map_relocations(char *elfpath, int *map_fds, struct code_section *cs)
 	if (ret) goto cleanup;
 
 	while (cs) {
-		Elf64_Rel *rel = cs->rel_data;
+		Elf64_Rel *rel = (Elf64_Rel *)(cs->rel_data);
 		int n_rel = cs->rel_data_len / sizeof(*rel);
 
 		for (int i = 0; i < n_rel; i++) {
