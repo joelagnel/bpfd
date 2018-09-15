@@ -22,6 +22,8 @@ struct code_section {
 	void *rel_data;
 	int rel_data_len;
 
+	int prog_fd; /* fd after loading */
+
 	/* sections added as discovered */
 	struct code_section *next;
 };
@@ -540,9 +542,46 @@ cleanup:
 	if (map_names) free(map_names);
 }
 
+int load_all_cs(struct code_section *cs, char *license)
+{
+	int ret, kvers;
+
+	// TODO: Need to set kvers to kernel version to bypass load checks
+
+	while(cs) {
+		switch(cs->type) {
+			case BPF_PROG_TYPE_KPROBE:
+			case BPF_PROG_TYPE_TRACEPOINT:
+				ret = bpf_prog_load(cs->type, cs->name,
+						(struct bpf_insn *)cs->data,
+						(cs->data_len / sizeof(struct bpf_insn)),
+						license, kvers, 3, NULL, 0);
+
+				if (!ret) ret = -EINVAL;
+				if (ret < 0) return ret;
+
+				cs->prog_fd = ret;
+				break;
+			default:
+				fprintf(stderr, "Undefined cs type %d\n", cs->type);
+				return -1;
+		}
+
+		cs = cs->next;
+	}
+
+	return 0;
+}
+
+/*
+int bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
+int bpf_attach_tracepoint(int progfd, const char *tp_category,
+                          const char *tp_name);
+*/
+
 int main()
 {
-	char *license;
+	char *license = NULL;
 	char elfpath[] = "tracex2_kern.o";
 	struct code_section *cs;
 	int n_maps, bytes;
@@ -569,6 +608,8 @@ int main()
 
 	apply_map_relocations(elfpath, map_fds, cs);
 
+	load_all_cs(cs, license);
+
 	while (cs) {
 		char fname[20];
 		FILE *f;
@@ -589,6 +630,8 @@ int main()
 
 		cs = cs->next;
 	}
+
+	if (license) free(license);
 
 	return 0;
 }
