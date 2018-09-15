@@ -15,7 +15,7 @@ enum code_type {
 };
 
 struct code_section {
-	enum code_type type;
+	enum bpf_prog_type type;
 	char *name;
 	void *data;
 	int data_len;
@@ -311,7 +311,7 @@ int read_code_sections(const char *elfpath, struct code_section **cs_ptr)
 			     _startswith(name, "tracepoint/"))) {
 
 			cs = (struct code_section *)calloc(1, sizeof(*cs));
-			cs->type = (_startswith(name, "kprobe/")) ? KPROBE : TRACEPOINT;
+			cs->type = (_startswith(name, "kprobe/")) ? BPF_PROG_TYPE_KPROBE : BPF_PROG_TYPE_TRACEPOINT;
 			cs->name = name;
 			ret = read_section64_by_id(elfpath, i, &bytes, &cs->data);
 			if (ret) goto done;
@@ -326,8 +326,8 @@ int read_code_sections(const char *elfpath, struct code_section **cs_ptr)
 			ret = get_sym64_name(elfpath, sh_table[i+1].sh_name, &name);
 			if (ret) goto done;
 
-			if (name && ((cs->type == KPROBE && _startswith(name, ".relkprobe/"))||
-				     (cs->type == TRACEPOINT &&_startswith(name, ".reltracepoint/")))) {
+			if (name && ((cs->type == BPF_PROG_TYPE_KPROBE && _startswith(name, ".relkprobe/"))||
+				     (cs->type == BPF_PROG_TYPE_TRACEPOINT &&_startswith(name, ".reltracepoint/")))) {
 				ret = read_section64_by_id(elfpath, i+1, &bytes, &cs->rel_data);
 				if (ret) goto done;
 				cs->rel_data_len = bytes;
