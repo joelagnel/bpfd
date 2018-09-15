@@ -14,6 +14,8 @@
 #include <string>
 #include <cstdlib>
 
+using namespace std;
+
 enum code_type {
 	TRACEPOINT,
 	KPROBE
@@ -555,22 +557,22 @@ int get_machine_kvers(void)
 		return -1;
 	uname_out = un.release;
 
-	std::string s = uname_out;
-	std::string token, delim = ".", delim2 = "-";
+	string s = uname_out;
+	string token, delim = ".", delim2 = "-";
 	size_t pos = 0;
 	int cur_num = 0;
 
-	while ((pos = s.find(delim)) != std::string::npos && cur_num < 3) {
+	while ((pos = s.find(delim)) != string::npos && cur_num < 3) {
 		token = s.substr(0, pos);
 		s.erase(0, pos + delim.length());
 
-		if ((pos = token.find(delim2)) != std::string::npos)
+		if ((pos = token.find(delim2)) != string::npos)
 			token = token.substr(0, pos);
 
 		nums[cur_num++] = stoi(token);
 	}
 
-	if ((pos = s.find(delim2)) != std::string::npos)
+	if ((pos = s.find(delim2)) != string::npos)
 		token = s.substr(0, pos);
 	else
 		token = s;
