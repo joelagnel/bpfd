@@ -511,7 +511,7 @@ void apply_map_relocations(const char *elfpath, int *map_fds, struct code_sectio
 	ret = get_map_names(elfpath, &n_maps, &map_names);
 	if (ret) goto cleanup;
 
-	while (cs) {
+	for (; cs; cs = cs->next) {
 		Elf64_Rel *rel = (Elf64_Rel *)(cs->rel_data);
 		int n_rel = cs->rel_data_len / sizeof(*rel);
 
@@ -535,8 +535,6 @@ void apply_map_relocations(const char *elfpath, int *map_fds, struct code_sectio
 
 			if (sym_name) free(sym_name);
 		}
-
-		cs = cs->next;
 	}
 cleanup:
 	if (map_names) free(map_names);
@@ -548,7 +546,7 @@ int load_all_cs(struct code_section *cs, char *license)
 
 	// TODO: Need to set kvers to kernel version to bypass load checks
 
-	while(cs) {
+	for (; cs; cs = cs->next) {
 		switch(cs->type) {
 			case BPF_PROG_TYPE_KPROBE:
 			case BPF_PROG_TYPE_TRACEPOINT:
@@ -566,8 +564,6 @@ int load_all_cs(struct code_section *cs, char *license)
 				fprintf(stderr, "Undefined cs type %d\n", cs->type);
 				return -1;
 		}
-
-		cs = cs->next;
 	}
 
 	return 0;
@@ -610,7 +606,7 @@ int main()
 
 	load_all_cs(cs, license);
 
-	while (cs) {
+	for (; cs; cs = cs->next) {
 		char fname[20];
 		FILE *f;
 
@@ -627,8 +623,6 @@ int main()
 
 		f = fopen(fname, "w+");
 		fwrite(cs->rel_data, cs->rel_data_len, 1, f);
-
-		cs = cs->next;
 	}
 
 	if (license) free(license);
