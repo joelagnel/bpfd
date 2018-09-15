@@ -593,6 +593,8 @@ int load_all_cs(struct code_section *cs, char *license)
 	if ((kvers = get_machine_kvers()) < 0)
 		return -1;
 
+	printf("kv is %d\n", kvers);
+
 	for (; cs; cs = cs->next) {
 		switch(cs->type) {
 			case BPF_PROG_TYPE_KPROBE:
@@ -626,7 +628,7 @@ int main()
 {
 	char *license = NULL;
 	char elfpath[] = "tracex2_kern.o";
-	struct code_section *cs;
+	struct code_section *cs = NULL;
 	int n_maps, bytes;
 	int *map_fds, ret;
 
