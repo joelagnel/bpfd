@@ -4,10 +4,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <sys/utsname.h>
 #include <linux/elf.h>
 #include <unistd.h>
 
 #include "libbpf.h"
+
+#include <iostream>
+#include <string>
+#include <cstdlib>
 
 enum code_type {
 	TRACEPOINT,
@@ -540,11 +545,51 @@ cleanup:
 	if (map_names) free(map_names);
 }
 
+int get_machine_kvers(void)
+{
+	struct utsname un;
+	char *uname_out;
+	int nums[3]; // maj, min, sub
+
+	if (uname(&un))
+		return -1;
+	uname_out = un.release;
+
+	std::string s = uname_out;
+	std::string token, delim = ".", delim2 = "-";
+	size_t pos = 0;
+	int cur_num = 0;
+
+	while ((pos = s.find(delim)) != std::string::npos && cur_num < 3) {
+		token = s.substr(0, pos);
+		s.erase(0, pos + delim.length());
+
+		if ((pos = token.find(delim2)) != std::string::npos)
+			token = token.substr(0, pos);
+
+		nums[cur_num++] = stoi(token);
+	}
+
+	if ((pos = s.find(delim2)) != std::string::npos)
+		token = s.substr(0, pos);
+	else
+		token = s;
+
+	if (token.length() > 0 && cur_num < 3)
+		nums[cur_num++] = stoi(token);
+
+	if (cur_num != 3)
+		return -1;
+	else
+		return (65536 * nums[0] + 256 * nums[1] + nums[2]);
+}
+
 int load_all_cs(struct code_section *cs, char *license)
 {
 	int ret, kvers;
 
-	// TODO: Need to set kvers to kernel version to bypass load checks
+	if ((kvers = get_machine_kvers()) < 0)
+		return -1;
 
 	for (; cs; cs = cs->next) {
 		switch(cs->type) {
