@@ -77,3 +77,5 @@ int tp_cpufreq(struct cpufreq_args *args)
     bpf_map_update_elem(&cpu_freq, &cpu, &new, BPF_ANY);
     return 0;
 }
+
+char _license[] SEC("license") = "GPL";
