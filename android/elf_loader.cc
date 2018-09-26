@@ -599,6 +599,7 @@ int load_all_cs(struct code_section *cs, char *license)
 		switch(cs->type) {
 			case BPF_PROG_TYPE_KPROBE:
 			case BPF_PROG_TYPE_TRACEPOINT:
+				printf("loading prog %s: insns: %d, addr:%p\n", cs->name, (cs->data_len / sizeof(struct bpf_insn)), cs->data);
 				ret = bpf_prog_load(cs->type, cs->name,
 						(struct bpf_insn *)cs->data,
 						cs->data_len,
@@ -627,7 +628,7 @@ int bpf_attach_tracepoint(int progfd, const char *tp_category,
 int main()
 {
 	char *license = NULL;
-	char elfpath[] = "tracex2_kern.o";
+	char elfpath[] = "timeinstate/bpf_kern.o";
 	struct code_section *cs = NULL;
 	int n_maps, bytes;
 	int *map_fds, ret;
