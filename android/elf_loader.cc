@@ -601,7 +601,7 @@ int load_all_cs(struct code_section *cs, char *license)
 			case BPF_PROG_TYPE_TRACEPOINT:
 				ret = bpf_prog_load(cs->type, cs->name,
 						(struct bpf_insn *)cs->data,
-						(cs->data_len / sizeof(struct bpf_insn)),
+						cs->data_len,
 						license, kvers, 3, NULL, 0);
 
 				if (!ret) ret = -EINVAL;
