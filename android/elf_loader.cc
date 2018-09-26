@@ -599,11 +599,10 @@ int load_all_cs(struct code_section *cs, char *license)
 		switch(cs->type) {
 			case BPF_PROG_TYPE_KPROBE:
 			case BPF_PROG_TYPE_TRACEPOINT:
-				printf("loading prog %s: insns: %d, addr:%p\n", cs->name, (cs->data_len / sizeof(struct bpf_insn)), cs->data);
 				ret = bpf_prog_load(cs->type, cs->name,
 						(struct bpf_insn *)cs->data,
 						cs->data_len,
-						license, kvers, 3, NULL, 0);
+						license, kvers, 0, NULL, 0);
 
 				if (!ret) ret = -EINVAL;
 				if (ret < 0) return ret;
