@@ -15,6 +15,8 @@
 #include <string>
 #include <cstdlib>
 
+#define BPF_FS_PATH "/sys/fs/bpf/"
+
 using namespace std;
 
 enum code_type {
@@ -463,6 +465,7 @@ int create_maps(const char *elfpath, int *n, int **map_ret)
 	int bytes, *map_fds = NULL, ret = 0, nmaps;
 	struct bpf_map_def *md = NULL;
 	char **map_names = NULL;
+	string fname = path_filename(string(elfpath), true);
 
 	ret = read_section64_by_name("maps", elfpath, &bytes, (void **)&md);
 	if (ret) goto cleanup;
@@ -475,17 +478,35 @@ int create_maps(const char *elfpath, int *n, int **map_ret)
 
 	for (int i = 0; i < nmaps; i++)
 	{
-		int fd;
-		fd = bpf_create_map(md[i].type, map_names[i],
+		// Format of pin location is /sys/fs/bpf/map_<filename>_<mapname>
+		string map_pin_loc;
+		map_pin_loc = string(BPF_FS_PATH) + "map_" + fname + "_"
+			      + string(map_names[i]);
+		if (access(map_pin_loc.c_str(), F_OK) == 0) {
+			ret = -EEXIST;
+			goto cleanup;
+		}
+
+		int fd = bpf_create_map(md[i].type, map_names[i],
 				md[i].key_size, md[i].value_size,
 				md[i].max_entries, md[i].map_flags);
+		if (fd < 0) {
+			ret = fd;
+			goto cleanup;
+		}
+
+		ret = bpf_obj_pin(fd, map_pin_loc.c_str());
+		if (ret < 0)
+			goto cleanup;
+
 		map_fds[i] = fd;
-		printf("map %d is %s with fd %d\n", i, map_names[i], fd);
+		printf("map %d is %s with fd %d @ %s\n", i, map_names[i], fd, map_pin_loc.c_str());
 	}
 
 	*n = nmaps;
 	*map_ret = map_fds;
 cleanup:
+	if (ret < 0 && map_fds) free(map_fds);
 	if (map_names) free(map_names);
 	if (md) free(md);
 	return ret;

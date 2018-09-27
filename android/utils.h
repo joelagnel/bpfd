@@ -28,13 +28,19 @@ static vector<string> splitpath(const string &str,
 	return result;
 }
 
-static const char *path_filename(const char *c_path)
+static string path_filename(string path, bool noext = false)
 {
-	const string path(c_path);
 	const set<char> delims{'\\', '/'};
 	vector<string> spath = splitpath(path, delims);
+	string ret;
 
-	return spath.back().c_str();
+	ret = spath.back();
+
+	if (noext) {
+		size_t lastindex = ret.find_last_of(".");
+		return ret.substr(0, lastindex);
+	}
+	return ret;
 }
 
 static int get_machine_kvers(void)
