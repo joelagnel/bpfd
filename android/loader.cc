@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #include "libbpf.h"
+#include "utils.h"
 
 #include <iostream>
 #include <string>
@@ -545,45 +546,6 @@ void apply_map_relocations(const char *elfpath, int *map_fds, struct code_sectio
 	}
 cleanup:
 	if (map_names) free(map_names);
-}
-
-int get_machine_kvers(void)
-{
-	struct utsname un;
-	char *uname_out;
-	int nums[3]; // maj, min, sub
-
-	if (uname(&un))
-		return -1;
-	uname_out = un.release;
-
-	string s = uname_out;
-	string token, delim = ".", delim2 = "-";
-	size_t pos = 0;
-	int cur_num = 0;
-
-	while ((pos = s.find(delim)) != string::npos && cur_num < 3) {
-		token = s.substr(0, pos);
-		s.erase(0, pos + delim.length());
-
-		if ((pos = token.find(delim2)) != string::npos)
-			token = token.substr(0, pos);
-
-		nums[cur_num++] = stoi(token);
-	}
-
-	if ((pos = s.find(delim2)) != string::npos)
-		token = s.substr(0, pos);
-	else
-		token = s;
-
-	if (token.length() > 0 && cur_num < 3)
-		nums[cur_num++] = stoi(token);
-
-	if (cur_num != 3)
-		return -1;
-	else
-		return (65536 * nums[0] + 256 * nums[1] + nums[2]);
 }
 
 int load_all_cs(struct code_section *cs, char *license)
