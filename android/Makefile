@@ -1,7 +1,7 @@
 CC ?= gcc
 CXX ?= g++
 
-bpfloader: libbpf.o perf_reader.o elf_loader.cc
+bpfloader: libbpf.o perf_reader.o loader.cc
 	g++ $^ -o $@
 
 clean:
