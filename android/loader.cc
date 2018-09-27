@@ -324,6 +324,7 @@ int read_code_sections(const char *elfpath, struct code_section **cs_ptr)
 
 			cs = (struct code_section *)calloc(1, sizeof(*cs));
 			cs->type = (_startswith(name, "kprobe/")) ? BPF_PROG_TYPE_KPROBE : BPF_PROG_TYPE_TRACEPOINT;
+			deslash(name);
 			cs->name = name;
 			ret = read_section64_by_id(elfpath, i, &bytes, &cs->data);
 			if (ret) goto done;
@@ -369,17 +370,6 @@ done:
 	}
 	if (sh_table) free(sh_table);
 	return ret;
-}
-
-void deslash(char *s)
-{
-	if (!s)
-		return;
-
-	for (int i = 0; i < strlen(s); i++) {
-		if (s[i] == '/')
-			s[i] = '_';
-	}
 }
 
 int get_sym64_name_from_index(const char *elfpath, int index, char **name_ret)
@@ -500,7 +490,6 @@ int create_maps(const char *elfpath, int *n, int **map_ret)
 			goto cleanup;
 
 		map_fds[i] = fd;
-		printf("map %d is %s with fd %d @ %s\n", i, map_names[i], fd, map_pin_loc.c_str());
 	}
 
 	*n = nmaps;
@@ -569,26 +558,38 @@ cleanup:
 	if (map_names) free(map_names);
 }
 
-int load_all_cs(struct code_section *cs, char *license)
+int load_all_cs(const char *elfpath, struct code_section *cs, char *license)
 {
-	int ret, kvers;
+	int ret, fd, kvers;
 
 	if ((kvers = get_machine_kvers()) < 0)
 		return -1;
 
+	string fname = path_filename(string(elfpath), true);
+
 	for (; cs; cs = cs->next) {
+		string prog_pin_loc;
+
 		switch(cs->type) {
 			case BPF_PROG_TYPE_KPROBE:
 			case BPF_PROG_TYPE_TRACEPOINT:
-				ret = bpf_prog_load(cs->type, cs->name,
+				// Format of pin location is
+				// /sys/fs/bpf/prog_<filename>_<mapname>
+				prog_pin_loc = string(BPF_FS_PATH) + "prog_"
+					+ fname + "_" + string(cs->name);
+				if (access(prog_pin_loc.c_str(), F_OK) == 0)
+					return -EEXIST;
+
+				fd = bpf_prog_load(cs->type, cs->name,
 						(struct bpf_insn *)cs->data,
 						cs->data_len,
 						license, kvers, 0, NULL, 0);
+				if (fd <= 0) return -EINVAL;
 
-				if (!ret) ret = -EINVAL;
+				ret = bpf_obj_pin(fd, prog_pin_loc.c_str());
 				if (ret < 0) return ret;
 
-				cs->prog_fd = ret;
+				cs->prog_fd = fd;
 				break;
 			default:
 				fprintf(stderr, "Undefined cs type %d\n", cs->type);
@@ -616,8 +617,6 @@ int main()
 	ret = read_section64_by_name("license", elfpath, &bytes, (void **)&license);
 	if (ret)
 		printf("couldn't find license\n");
-	else
-		printf("License: %s\n", license);
 
 	/* dump all code and rel sections */
 	ret = read_code_sections(elfpath, &cs);
@@ -629,12 +628,12 @@ int main()
 	if (ret)
 		printf("failed to create maps\n");
 
-	for (int i = 0; i < n_maps; i++)
-		printf("fd: %d\n", map_fds[i]);
-
 	apply_map_relocations(elfpath, map_fds, cs);
 
-	load_all_cs(cs, license);
+	if (load_all_cs(elfpath, cs, license))
+		printf("failed to load programs\n");
+
+	return 0;
 
 	for (; cs; cs = cs->next) {
 		char fname[20];

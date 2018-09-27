@@ -81,3 +81,14 @@ static int get_machine_kvers(void)
 	else
 		return (65536 * nums[0] + 256 * nums[1] + nums[2]);
 }
+
+static void deslash(char *s)
+{
+	if (!s)
+		return;
+
+	for (int i = 0; i < strlen(s); i++) {
+		if (s[i] == '/')
+			s[i] = '_';
+	}
+}
