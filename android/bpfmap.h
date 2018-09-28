@@ -152,10 +152,10 @@ class BpfMap {
                 ret = getNextKey(ret.first);
             }
 
-            if (ret == -ENOENT)
+            if (ret.second == -ENOENT)
                 return 0;
             else
-                return ret;
+                return ret.second;
         }
 
         int iterateWithValue(filter_key_val_t &filter) const
