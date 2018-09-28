@@ -604,6 +604,52 @@ static int load_all_cs(const char *elfpath, struct code_section *cs, char *licen
 	return 0;
 }
 
+int load_prog(const char *elfpath)
+{
+	char *license = NULL;
+	struct code_section *cs = NULL, *csnext = NULL;
+	int n_maps = 0, bytes;
+	int *map_fds = NULL, ret = 0;
+
+	ret = read_section64_by_name("license", elfpath, &bytes, (void **)&license);
+	if (ret) {
+		printf("couldn't find license\n");
+		goto cleanup;
+	}
+
+	/* dump all code and rel sections */
+	ret = read_code_sections(elfpath, &cs);
+	if (ret) {
+		printf("couldn't read cs\n");
+		goto cleanup;
+	}
+
+	ret = create_maps(elfpath, &n_maps, &map_fds);
+	if (ret) {
+		printf("failed to create maps: %d %d\n", ret, errno);
+		goto cleanup;
+	}
+
+	apply_map_relocations(elfpath, map_fds, cs);
+
+	ret = load_all_cs(elfpath, cs, license);
+	if (ret) {
+		printf("failed to load programs\n");
+		goto cleanup;
+	}
+
+cleanup:
+	if (license) free(license);
+	if (map_fds) free(map_fds);
+	while (cs) {
+		csnext = cs->next;
+		free(cs);
+		cs = csnext;
+	}
+
+	return ret;
+}
+
 }
 }
 /*
@@ -614,33 +660,20 @@ int bpf_attach_tracepoint(int progfd, const char *tp_category,
 
 int main()
 {
-	char *license = NULL;
 	char elfpath[] = "timeinstate/bpf_kern.o";
-	struct code_section *cs = NULL;
-	int n_maps, bytes;
-	int *map_fds, ret;
 
-	ret = read_section64_by_name("license", elfpath, &bytes, (void **)&license);
-	if (ret)
-		printf("couldn't find license\n");
+	int ret = load_prog(elfpath);
+	if (ret) {
+		printf("main: prog load failed\n");
+		return ret;
+	}
 
-	/* dump all code and rel sections */
-	ret = read_code_sections(elfpath, &cs);
-	if (ret) printf("couldn't read cs\n");
-
-	n_maps = 0;
-
-	ret = create_maps(elfpath, &n_maps, &map_fds);
-	if (ret)
-		printf("failed to create maps\n");
-
-	apply_map_relocations(elfpath, map_fds, cs);
-
-	if (load_all_cs(elfpath, cs, license))
-		printf("failed to load programs\n");
+	android::bpf::BpfMap<int, int> m;
+	m.clear();
 
 	return 0;
 
+#if 0
 	for (; cs; cs = cs->next) {
 		char fname[20];
 		FILE *f;
@@ -659,11 +692,7 @@ int main()
 		f = fopen(fname, "w+");
 		fwrite(cs->rel_data, cs->rel_data_len, 1, f);
 	}
-
 	if (license) free(license);
-
-	android::bpf::BpfMap<int, int> m;
-	m.clear();
-
+#endif
 	return 0;
 }
