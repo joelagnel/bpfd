@@ -657,5 +657,8 @@ int main()
 
 	if (license) free(license);
 
+	BpfMap<int, int> m;
+	m.clear();
+
 	return 0;
 }
