@@ -54,7 +54,7 @@ namespace bpfutils {
 								BpfMap<Key, Value>(std::string pin_path) {
 										int ret = bpf_obj_get(pin_path.c_str());
 										if (ret < 0)
-												throw new exception("Cannot open pinned map  location.");
+												throw new runtime_error("Cannot open pinned map  location.");
 										mPinnedPath = pin_path;
 										mMapFd = ret;
 								}
@@ -168,9 +168,8 @@ namespace bpfutils {
 												lookup_ret = lookup(ret.first);
 												if (lookup_ret.second < 0)
 														return lookup_ret.second;
-												value = lookup_ret.first;
 
-												int filter_ret = filter(ret.first, value, *this);
+												int filter_ret = filter(ret.first, lookup_ret.first, *this);
 												if (filter_ret < 0)
 														return filter_ret;
 
