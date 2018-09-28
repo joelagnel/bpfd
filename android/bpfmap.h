@@ -22,9 +22,9 @@
 #include "libbpf.h"
 
 // Prototypes of map filter functions
-#define filter_key_t std::function<int(const Key &key, const BpfMap<Key, Value> &map)>
+#define filter_key_t const std::function<int(const Key &key, const BpfMap<Key, Value> &map)>
 #define filter_key_val_t \
- std::function<int(const Key &key, const Value &value, const BpfMap<Key, Value> &map)>
+ const std::function<int(const Key &key, const Value &value, const BpfMap<Key, Value> &map)>
 
 #if 0
 #include <utils/Log.h>
@@ -117,7 +117,7 @@ class BpfMap {
         // It is only safe to call this method if guaranteed nothing
         // will concurrently iterate over the map in any process.
         int clear() {
-            const auto deleteAllEntries = [](const Key& key, BpfMap<Key, Value>& map) {
+            const auto deleteAllEntries = [](const Key& key, const BpfMap<Key, Value>& map) {
                 int res = map.delete_elem(key);
                 if (res < 0 && res != -ENOENT)
                     ALOGE("Failed to delete map data %s\n", strerror(res.code()));
