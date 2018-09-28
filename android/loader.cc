@@ -658,6 +658,7 @@ int bpf_attach_tracepoint(int progfd, const char *tp_category,
                           const char *tp_name);
 */
 
+#if 0
 int main()
 {
 	char elfpath[] = "timeinstate/bpf_kern.o";
@@ -673,7 +674,6 @@ int main()
 
 	return 0;
 
-#if 0
 	for (; cs; cs = cs->next) {
 		char fname[20];
 		FILE *f;
@@ -693,6 +693,6 @@ int main()
 		fwrite(cs->rel_data, cs->rel_data_len, 1, f);
 	}
 	if (license) free(license);
-#endif
 	return 0;
 }
+#endif

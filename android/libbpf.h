@@ -39,6 +39,9 @@
 namespace android {
 namespace bpf {
 
+// BPF loader implementation. Loads an eBPF ELF object
+int load_prog(const char *elfpath);
+
 // This is a class wrapper for eBPF maps. The eBPF map is a special in-kernel
 // data structure that stores data in <Key, Value> pairs. It can be read/write
 // from userspace by passing syscalls with the map file descriptor. This class
