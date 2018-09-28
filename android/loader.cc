@@ -10,6 +10,7 @@
 
 #include "libbpf.h"
 #include "utils.h"
+#include "bpfmap.h"
 
 #include <iostream>
 #include <string>
