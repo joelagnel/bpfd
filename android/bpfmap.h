@@ -79,7 +79,8 @@ class BpfMap {
         // Return a pair containing Key and status
         std::pair<Key, int> getNextKey(const Key &key) const {
             Key nextKey;
-            int ret = bpf_get_next_key(mMapFd, &key);
+            int ret = bpf_get_next_key(mMapFd, (void *)&key,
+                                       (void *)&nextKey);
             if (ret < 0) { ret = -errno; }
 
             return std::make_pair(nextKey, ret);
@@ -103,7 +104,7 @@ class BpfMap {
 
         // Return status
         int delete_elem(const Key& key) const {
-            int ret = bpf_delete_elem(mMapFd, &key);
+            int ret = bpf_delete_elem(mMapFd, (void *)&key);
             if (ret < 0) return -errno;
             return ret;
         }
