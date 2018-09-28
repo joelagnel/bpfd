@@ -1,4 +1,8 @@
 /*
+ * Low level eBPF library borrowed from BCC project and periodically
+ * refreshed as eBPF support advances.
+ */
+/*
  * Copyright (c) 2015 PLUMgrid, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -45,7 +49,7 @@
 #include <unistd.h>
 #include <linux/if_alg.h>
 
-#include "libbpf.h"
+#include "libbpf_bcc.h"
 #include "perf_reader.h"
 
 // TODO: Remove this when CentOS 6 support is not needed anymore

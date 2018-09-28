@@ -10,7 +10,6 @@
 
 #include "libbpf.h"
 #include "utils.h"
-#include "bpfmap.h"
 
 #include <iostream>
 #include <string>
@@ -19,6 +18,10 @@
 #define BPF_FS_PATH "/sys/fs/bpf/"
 
 using namespace std;
+using namespace android::bpf;
+
+namespace android {
+namespace bpf {
 
 enum code_type {
 	TRACEPOINT,
@@ -49,7 +52,7 @@ struct bpf_map_def {
 	unsigned int numa_node;
 };
 
-int read_elf64_header(const char *elfpath, Elf64_Ehdr *eh)
+static int read_elf64_header(const char *elfpath, Elf64_Ehdr *eh)
 {
 	FILE *elf_file;
 	int ret = 0;
@@ -65,7 +68,7 @@ cleanup:
 }
 
 /* Reads all section header tables into an Shdr array */
-int read_section64_headers_all(const char *elfpath, int *entries, Elf64_Shdr **sh_table_ret)
+static int read_section64_headers_all(const char *elfpath, int *entries, Elf64_Shdr **sh_table_ret)
 {
 	Elf64_Ehdr eh;
 	Elf64_Shdr *sh_table = NULL;
@@ -111,7 +114,7 @@ cleanup:
 }
 
 /* Read a section by its index - for ex to get sec hdr strtab blob */
-int read_section64_by_id(const char *elfpath, int id, int *bytes, void **section)
+static int read_section64_by_id(const char *elfpath, int id, int *bytes, void **section)
 {
 	Elf64_Shdr *sh_table;
 	Elf64_Off shoff;
@@ -147,7 +150,7 @@ cleanup:
 }
 
 /* Read whole section header string table */
-int read_section64_header_strtab(const char *elfpath, int *bytes, char **strtabp)
+static int read_section64_header_strtab(const char *elfpath, int *bytes, char **strtabp)
 {
 	Elf64_Ehdr eh;
 	FILE *elf_file;
@@ -171,7 +174,7 @@ cleanup:
 }
 
 /* Get name from offset in strtab */
-int get_sym64_name(const char *elfpath, int name_off, char **name_ret)
+static int get_sym64_name(const char *elfpath, int name_off, char **name_ret)
 {
 	char *sec_strtab = NULL, *name, *name2;
 	int bytes, ret = 0;
@@ -192,7 +195,7 @@ cleanup:
 }
 
 /* Reads a full section by name - example to get the GPL license */
-int read_section64_by_name(const char *name, const char *elfpath, int *bytes, void **ptr)
+static int read_section64_by_name(const char *name, const char *elfpath, int *bytes, void **ptr)
 {
 	char *sec_strtab;
 	char *data = NULL;
@@ -235,7 +238,7 @@ done:
 	return ret;
 }
 
-int read_section64_by_type(const char *elfpath, int type, int *bytes, void **ptr)
+static int read_section64_by_type(const char *elfpath, int type, int *bytes, void **ptr)
 {
 	char *data = NULL;
 	int n_sh_table, ret = 0;
@@ -271,7 +274,7 @@ done:
 	return ret;
 }
 
-int sym64_compare(const void *a1, const void *b1)
+static int sym64_compare(const void *a1, const void *b1)
 {
 	Elf64_Sym *a, *b;
 
@@ -281,7 +284,7 @@ int sym64_compare(const void *a1, const void *b1)
 	return (a->st_value - b->st_value);
 }
 
-int read_sym64_tab(const char *elfpath, int *bytes, int sort, Elf64_Sym **ptr)
+static int read_sym64_tab(const char *elfpath, int *bytes, int sort, Elf64_Sym **ptr)
 {
 	Elf64_Sym *data;
 	int ret;
@@ -296,14 +299,14 @@ int read_sym64_tab(const char *elfpath, int *bytes, int sort, Elf64_Sym **ptr)
 	return ret;
 }
 
-int _startswith(const char *a, const char *b)
+static int _startswith(const char *a, const char *b)
 {
    if (strncmp(a, b, strlen(b)) == 0) return 1;
    return 0;
 }
 
 /* Read a section by its index - for ex to get sec hdr strtab blob */
-int read_code_sections(const char *elfpath, struct code_section **cs_ptr)
+static int read_code_sections(const char *elfpath, struct code_section **cs_ptr)
 {
 	Elf64_Shdr *sh_table;
 	int entries, ret = 0;
@@ -373,7 +376,7 @@ done:
 	return ret;
 }
 
-int get_sym64_name_from_index(const char *elfpath, int index, char **name_ret)
+static int get_sym64_name_from_index(const char *elfpath, int index, char **name_ret)
 {
 	Elf64_Sym *symtab;
 	int bytes, ret = 0;
@@ -393,7 +396,7 @@ cleanup:
 	return ret;
 }
 
-int get_map_names(const char *elfpath, int *n, char ***map_names_ptr)
+static int get_map_names(const char *elfpath, int *n, char ***map_names_ptr)
 {
 	Elf64_Sym *symtab = NULL;
 	Elf64_Shdr *sh_table = NULL;
@@ -451,7 +454,7 @@ cleanup:
 	return ret;
 }
 
-int create_maps(const char *elfpath, int *n, int **map_ret)
+static int create_maps(const char *elfpath, int *n, int **map_ret)
 {
 	int bytes, *map_fds = NULL, ret = 0, nmaps;
 	struct bpf_map_def *md = NULL;
@@ -502,7 +505,7 @@ cleanup:
 	return ret;
 }
 
-void apply_relo(void *insns_p, Elf64_Addr offset, int fd)
+static void apply_relo(void *insns_p, Elf64_Addr offset, int fd)
 {
 	int insn_index;
 	struct bpf_insn *insn, *insns;
@@ -522,7 +525,7 @@ void apply_relo(void *insns_p, Elf64_Addr offset, int fd)
 	insn->src_reg = BPF_PSEUDO_MAP_FD;
 }
 
-void apply_map_relocations(const char *elfpath, int *map_fds, struct code_section *cs)
+static void apply_map_relocations(const char *elfpath, int *map_fds, struct code_section *cs)
 {
 	int n_maps, ret;
 	char **map_names = NULL;
@@ -559,7 +562,7 @@ cleanup:
 	if (map_names) free(map_names);
 }
 
-int load_all_cs(const char *elfpath, struct code_section *cs, char *license)
+static int load_all_cs(const char *elfpath, struct code_section *cs, char *license)
 {
 	int ret, fd, kvers;
 
@@ -601,6 +604,8 @@ int load_all_cs(const char *elfpath, struct code_section *cs, char *license)
 	return 0;
 }
 
+}
+}
 /*
 int bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
 int bpf_attach_tracepoint(int progfd, const char *tp_category,
@@ -657,7 +662,7 @@ int main()
 
 	if (license) free(license);
 
-	BpfMap<int, int> m;
+	android::bpf::BpfMap<int, int> m;
 	m.clear();
 
 	return 0;

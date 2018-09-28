@@ -17,7 +17,7 @@
 #ifndef PERF_READER_H
 #define PERF_READER_H
 
-#include "libbpf.h"
+#include "libbpf_bcc.h"
 
 #ifdef __cplusplus
 extern "C" {
