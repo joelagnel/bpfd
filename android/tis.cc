@@ -18,17 +18,22 @@ int main(void) {
 	ret = bpf_attach_tracepoint(prog_fd, "power", "cpu_frequency");
 	printf("tp power attach %d\n", ret);
 
-	return 0;
+	map_fd = bpf_obj_get("/sys/fs/bpf/map_bpf_kern_uid_times");
 
-	BpfMapPerCpu<int, int> m(2);
-
+	BpfMapPerCpu<int, int> m(map_fd);
         const auto iterf = [](const int& key,
 			      const std::vector<int>& vals,
 			      const BpfMap<int, int>& map) {
-		printf("test\n");
+		printf("Iter key %d\n", key);
+		for (auto i = vals.begin(); i != vals.end(); ++i) {
+			std::cout << *i << ' ';
+		}
+		printf("\n");
 
 		return 0;
 	};
-
         m.iterateWithValues(iterf);
+
+	return 0;
+
 }
