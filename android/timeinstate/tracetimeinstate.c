@@ -41,8 +41,8 @@ struct switch_args {
 SEC("tracepoint/sched/sched_switch")
 int tp_sched_switch(struct switch_args *args)
 {
-    char s[] = { "testprog %u\\n" };
-    bpf_trace_printk(s, 5);
+    // char s[] = { "testprog %u\\n" };
+    // bpf_trace_printk(s, 5);
 
     uint32_t zero = 0;
     uint64_t *last = bpf_map_lookup_elem(&cpu_last_update, &zero);
@@ -68,8 +68,8 @@ int tp_sched_switch(struct switch_args *args)
 
 struct cpufreq_args {
         unsigned long long ignore;
-        unsigned int cpu_id;
         unsigned int state;
+        unsigned int cpu_id;
 };
 
 SEC("tracepoint/power/cpu_frequency")
