@@ -587,7 +587,7 @@ static int load_all_cs(const char *elfpath, struct code_section *cs, char *licen
 				fd = bpf_prog_load(cs->type, cs->name,
 						(struct bpf_insn *)cs->data,
 						cs->data_len,
-						license, kvers, 0, NULL, 0);
+						license, kvers, 3, NULL, 0);
 				if (fd <= 0) return -EINVAL;
 
 				ret = bpf_obj_pin(fd, prog_pin_loc.c_str());
