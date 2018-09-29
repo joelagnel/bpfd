@@ -197,30 +197,6 @@ class BpfMap {
         std::string mPinnedPath;
 };
 
-#define filter_key_vals_t \
- const std::function<int(const Key &key, const std::vector<Value> &values, const BpfMap<Key, Value> &map)>
-
-template <class Key, class Value>
-class BpfMapPerCpu: public BpfMap<Key, Value>
-{
-    public:
-        BpfMapPerCpu<Key, Value>(int fd): BpfMap<Key, Value>(fd) {}
-
-        int iterateWithValues(filter_key_vals_t &filter) const
-        {
-            const auto addVect = [filter](const Key& key, const Value& val, const BpfMap<Key, Value>& map) {
-                int nCpus = 8;  // fix: init from constructor
-
-                std::vector<Value> v(&val, &val + nCpus);
-                return filter(key, v, map);
-            };
-
-            BpfMap<Key, Value>::iterateWithValue(addVect);
-
-            return 0;
-        }
-};
-
 }
 }
 

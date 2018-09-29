@@ -43,24 +43,6 @@ int main(void) {
 	};
         m.iterateWithValue(iterf);
 
-
-
-	sleep(3);
-
-	BpfMapPerCpu<int, int> m(map_fd);
-        const auto iterf = [](const int& key,
-			      const std::vector<int>& vals,
-			      const BpfMap<int, int>& map) {
-		printf("Iter key %d\n", key);
-		for (auto i = vals.begin(); i != vals.end(); ++i) {
-			std::cout << *i << ' ';
-		}
-		printf("\n");
-
-		return 0;
-	};
-        m.iterateWithValues(iterf);
-
 	return 0;
 
 }
