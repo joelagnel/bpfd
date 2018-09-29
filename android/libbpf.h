@@ -140,8 +140,8 @@ class BpfMap {
             auto ret = this->getFirstKey();
             // Return error code ENOENT means the map is empty
             if (ret.second == -ENOENT)
-                return true;
-            return false;
+                return std::make_pair(true, 0);
+            return std::make_pair(false, ret.second);
         }
 
         int iterate(filter_key_t &filter) const
