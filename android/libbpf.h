@@ -20,6 +20,7 @@
 
 #include <linux/bpf.h>
 #include <functional>
+#include <vector>
 #include "libbpf_bcc.h"
 
 // Prototypes of map filter functions
@@ -103,7 +104,7 @@ class BpfMap {
         // Return a pair containing Value and status
         std::pair<Value, int> lookup(const Key& key) const {
             Value value;
-            int ret = bpf_lookup_elem(mMapFd, &key, &value);
+            int ret = bpf_lookup_elem(mMapFd, (void *)&key, &value);
             if (ret < 0) { ret = -errno; }
 
             return std::make_pair(value, ret);
@@ -200,18 +201,21 @@ class BpfMap {
  const std::function<int(const Key &key, const std::vector<Value> &values, const BpfMap<Key, Value> &map)>
 
 template <class Key, class Value>
-class BpfMapPerCpu: public BpfMap {
+class BpfMapPerCpu: public BpfMap<Key, Value>
+{
     public:
+        BpfMapPerCpu<Key, Value>(int fd): BpfMap<Key, Value>(fd) {}
+
         int iterateWithValues(filter_key_vals_t &filter) const
         {
             const auto addVect = [filter](const Key& key, const Value& val, const BpfMap<Key, Value>& map) {
                 int nCpus = 8;  // fix: init from constructor
 
                 std::vector<Value> v(&val, &val + nCpus);
-                filter(key, v, map);
-            }
+                return filter(key, v, map);
+            };
 
-            iterateWithValue(addVect);
+            BpfMap<Key, Value>::iterateWithValue(addVect);
 
             return 0;
         }
