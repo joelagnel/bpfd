@@ -1,6 +1,7 @@
 // Test-program for reading time_in_state
 
 #include <iostream>
+#include <unistd.h>
 #include "libbpf.h"
 
 using namespace android::bpf;
@@ -13,13 +14,15 @@ int main(void) {
 
 	prog_fd = bpf_obj_get("/sys/fs/bpf/prog_bpf_kern_tracepoint_sched_sched_switch");
 	ret = bpf_attach_tracepoint(prog_fd, "sched", "sched_switch");
-	printf("tp sched sw attach %d\n", ret);
+	printf("tp sched sw attached prog %d to %d\n", prog_fd, ret);
 
 	prog_fd = bpf_obj_get("/sys/fs/bpf/prog_bpf_kern_tracepoint_power_cpu_frequency");
 	ret = bpf_attach_tracepoint(prog_fd, "power", "cpu_frequency");
-	printf("tp power attach %d\n", ret);
+	printf("tp power attached prog %d to %d\n", prog_fd, ret);
 
 	map_fd = bpf_obj_get("/sys/fs/bpf/map_bpf_kern_uid_times");
+
+	sleep(3);
 
 	BpfMapPerCpu<int, int> m(map_fd);
         const auto iterf = [](const int& key,
