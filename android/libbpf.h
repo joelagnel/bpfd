@@ -185,15 +185,36 @@ class BpfMap {
                 ret = getNextKey(ret.first);
             }
 
-            if (ret == -ENOENT)
+            if (ret.second == -ENOENT)
                 return 0;
             else
-                return ret;
+                return ret.second;
         }
 
-    private:
+    protected:
         int mMapFd;
         std::string mPinnedPath;
+};
+
+#define filter_key_vals_t \
+ const std::function<int(const Key &key, const std::vector<Value> &values, const BpfMap<Key, Value> &map)>
+
+template <class Key, class Value>
+class BpfMapPerCpu: public BpfMap {
+    public:
+        int iterateWithValues(filter_key_vals_t &filter) const
+        {
+            const auto addVect = [filter](const Key& key, const Value& val, const BpfMap<Key, Value>& map) {
+                int nCpus = 8;  // fix: init from constructor
+
+                std::vector<Value> v(&val, &val + nCpus);
+                filter(key, v, map);
+            }
+
+            iterateWithValue(addVect);
+
+            return 0;
+        }
 };
 
 }
