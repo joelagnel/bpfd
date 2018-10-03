@@ -18,6 +18,8 @@
 #ifndef BPF_BPFMAP_H
 #define BPF_BPFMAP_H
 
+#include <stdint.h>
+#include <errno.h>
 #include <linux/bpf.h>
 #include <functional>
 #include <string>
