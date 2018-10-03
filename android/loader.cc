@@ -1,3 +1,19 @@
+/*
+ * Copyright (C) 2018 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #include <linux/bpf.h>
 #include <errno.h>
 #include <string.h>
@@ -62,7 +78,7 @@ static int read_elf64_header(const char *elfpath, Elf64_Ehdr *eh)
 
 	if (fread(eh, sizeof(*eh), 1, elf_file) != 1)
 		ret = -1;
-cleanup:
+
 	if (elf_file) fclose(elf_file);
 	return ret;
 }
@@ -117,7 +133,6 @@ cleanup:
 static int read_section64_by_id(const char *elfpath, int id, int *bytes, void **section)
 {
 	Elf64_Shdr *sh_table;
-	Elf64_Off shoff;
 	int entries, ret = 0;
 	FILE *elf_file;
 	char *sec;
@@ -197,7 +212,7 @@ cleanup:
 /* Reads a full section by name - example to get the GPL license */
 static int read_section64_by_name(const char *name, const char *elfpath, int *bytes, void **ptr)
 {
-	char *sec_strtab;
+	char *sec_strtab = NULL;
 	char *data = NULL;
 	int n_sh_table, ret = 0;
 	Elf64_Shdr *sh_table;
@@ -252,7 +267,7 @@ static int read_section64_by_type(const char *elfpath, int type, int *bytes, voi
 	if (ret) goto done;
 
 	for(int i = 0; i < n_sh_table; i++) {
-		if (sh_table[i].sh_type != type)
+		if ((int)sh_table[i].sh_type != type)
 			continue;
 
 		data = (char *)malloc(sh_table[i].sh_size);
@@ -385,7 +400,7 @@ static int get_sym64_name_from_index(const char *elfpath, int index, char **name
 	ret = read_sym64_tab(elfpath, &bytes, 0 /* !sort */, &symtab);
 	if (ret) goto cleanup;
 
-	if (index >= bytes / sizeof(*symtab)) { ret = -1; goto cleanup; }
+	if (index >= bytes / (int)sizeof(*symtab)) { ret = -1; goto cleanup; }
 
 	ret = get_sym64_name(elfpath, symtab[index].st_name, &name);
 	if (ret) goto cleanup;
@@ -426,14 +441,14 @@ static int get_map_names(const char *elfpath, int *n, char ***map_names_ptr)
 	if (maps_idx == -1) goto cleanup;
 
 	/* Count number of maps */
-	for (int i = 0; i < bytes / sizeof(*symtab); i++)
+	for (int i = 0; i < bytes / (int)sizeof(*symtab); i++)
 		if (symtab[i].st_shndx == maps_idx)
 			nmaps++;
 
 	names = (char **)calloc(nmaps, sizeof(char *));
 	if (!names) { ret = -ENOMEM; goto cleanup; }
 
-	for (int i = 0; i < bytes / sizeof(*symtab); i++) {
+	for (int i = 0; i < bytes / (int)sizeof(*symtab); i++) {
 		if (symtab[i].st_shndx == maps_idx) {
 			ret = get_sym64_name(elfpath, symtab[i].st_name, &names[j++]);
 			if (ret) {

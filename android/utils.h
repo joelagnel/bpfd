@@ -1,3 +1,7 @@
+/*
+ * eBPF library header borrowed from BCC project
+ */
+
 #include<stdio.h>
 #include<iostream>
 #include<vector>
@@ -87,7 +91,7 @@ static void deslash(char *s)
 	if (!s)
 		return;
 
-	for (int i = 0; i < strlen(s); i++) {
+	for (unsigned int i = 0; i < strlen(s); i++) {
 		if (s[i] == '/')
 			s[i] = '_';
 	}

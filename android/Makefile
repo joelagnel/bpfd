@@ -1,13 +1,13 @@
-CC ?= gcc
-CXX ?= g++
-CFLAGS = -fPIC
-CXXFLAGS = -fPIC
+CC = clang
+CXX = clang++
+CFLAGS = -fPIC -Werror -Wpointer-arith -Wsign-compare -Wunused-parameter -Wformat -Wunused-label -Wunused-variable -Wsometimes-uninitialized
+CXXFLAGS = -fPIC -std=c++11 -stdlib=libc++ -Werror -Wpointer-arith -Wsign-compare -Wunused-parameter -Wformat -Wunused-label -Wunused-variable -Wsometimes-uninitialized
 
-libbpf.so: libbpf.h libbpf_bcc.o perf_reader.o loader.o
-	g++ $^ -shared -o $@
+libbpf.so: libbpf_bcc.o perf_reader.o loader.o
+	clang++ $^ -shared -o $@
 
 tis: libbpf.so tis.cc
-	g++ -o tis tis.cc libbpf.so
+	clang++ -o tis tis.cc libbpf.so
 
 clean:
 	rm *.o bpfloader libbpf.so tis >/dev/null 2>&1 || true

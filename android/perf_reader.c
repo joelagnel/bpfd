@@ -1,4 +1,6 @@
 /*
+ * eBPF library perf_reader borrowed from BCC project
+ * Copyright (C) 2018 The Android Open Source Project
  * Copyright (c) 2015 PLUMgrid, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -186,7 +188,7 @@ void perf_reader_event_read(struct perf_reader *reader) {
       reader->buf = realloc(reader->buf, e->size);
       size_t len = sentinel - begin;
       memcpy(reader->buf, begin, len);
-      memcpy(reader->buf + len, base, e->size - len);
+      memcpy((void *)((unsigned long)reader->buf + len), base, e->size - len);
       ptr = reader->buf;
     }
 

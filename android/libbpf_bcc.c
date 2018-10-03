@@ -1,8 +1,6 @@
 /*
- * Low level eBPF library borrowed from BCC project and periodically
- * refreshed as eBPF support advances.
- */
-/*
+ * eBPF library code borrowed from BCC project
+ * Copyright (C) 2018 The Android Open Source Project
  * Copyright (c) 2015 PLUMgrid, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,6 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
@@ -347,7 +346,7 @@ static void bpf_print_hints(int ret, char *log)
     if (str != NULL) {
       helper_str = str + 1;
     }
-    int helper_id = atoi(helper_str);
+    unsigned int helper_id = atoi(helper_str);
     if (helper_id && helper_id < sizeof(helpers) / sizeof(struct bpf_helper)) {
       struct bpf_helper helper = helpers[helper_id - 1];
       fprintf(stderr, "HINT: bpf_%s missing (added in Linux %s).\n\n",
@@ -662,7 +661,7 @@ static int bpf_find_probe_type(const char *event_type)
   char buf[PATH_MAX];
 
   ret = snprintf(buf, sizeof(buf), PMU_TYPE_FILE, event_type);
-  if (ret < 0 || ret >= sizeof(buf))
+  if (ret < 0 || ret >= (int)sizeof(buf))
     return -1;
 
   fd = open(buf, O_RDONLY);
@@ -670,7 +669,7 @@ static int bpf_find_probe_type(const char *event_type)
     return -1;
   ret = read(fd, buf, sizeof(buf));
   close(fd);
-  if (ret < 0 || ret >= sizeof(buf))
+  if (ret < 0 || ret >= (int)sizeof(buf))
     return -1;
   errno = 0;
   ret = (int)strtol(buf, NULL, 10);
@@ -685,7 +684,7 @@ static int bpf_get_retprobe_bit(const char *event_type)
   char buf[PATH_MAX];
 
   ret = snprintf(buf, sizeof(buf), PMU_RETPROBE_FILE, event_type);
-  if (ret < 0 || ret >= sizeof(buf))
+  if (ret < 0 || ret >= (int)sizeof(buf))
     return -1;
 
   fd = open(buf, O_RDONLY);
@@ -693,7 +692,7 @@ static int bpf_get_retprobe_bit(const char *event_type)
     return -1;
   ret = read(fd, buf, sizeof(buf));
   close(fd);
-  if (ret < 0 || ret >= sizeof(buf))
+  if (ret < 0 || ret >= (int)sizeof(buf))
     return -1;
   if (strlen(buf) < strlen("config:"))
     return -1;
@@ -783,7 +782,7 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path, int pid,
     }
 
     bytes = read(efd, buf, sizeof(buf));
-    if (bytes <= 0 || bytes >= sizeof(buf)) {
+    if (bytes <= 0 || bytes >= (int)sizeof(buf)) {
       fprintf(stderr, "read(%s): %s\n", buf, strerror(errno));
       close(efd);
       return -1;
@@ -959,13 +958,13 @@ int bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type,
     }
 
     res = snprintf(event_alias, sizeof(event_alias), "%s_bcc_%d", ev_name, getpid());
-    if (res < 0 || res >= sizeof(event_alias)) {
+    if (res < 0 || res >= (int)sizeof(event_alias)) {
       fprintf(stderr, "Event name (%s) is too long for buffer\n", ev_name);
       goto error;
     }
     res = snprintf(buf, sizeof(buf), "%c:%ss/%s %s:0x%lx", attach_type==BPF_PROBE_ENTRY ? 'p' : 'r',
-                   event_type, event_alias, binary_path, offset);
-    if (res < 0 || res >= sizeof(buf)) {
+                   event_type, event_alias, binary_path, (unsigned long)offset);
+    if (res < 0 || res >= (int)sizeof(buf)) {
       fprintf(stderr, "Event alias (%s) too long for buffer\n", event_alias);
       goto error;
     }
@@ -1021,7 +1020,7 @@ static int bpf_detach_probe(const char *ev_name, const char *event_type)
   }
 
   res = snprintf(buf, sizeof(buf), "%ss/%s_bcc_%d", event_type, ev_name, getpid());
-  if (res < 0 || res >= sizeof(buf)) {
+  if (res < 0 || res >= (int)sizeof(buf)) {
     fprintf(stderr, "snprintf(%s): %d\n", ev_name, res);
     goto error;
   }
@@ -1046,7 +1045,7 @@ static int bpf_detach_probe(const char *ev_name, const char *event_type)
   }
 
   res = snprintf(buf, sizeof(buf), "-:%ss/%s_bcc_%d", event_type, ev_name, getpid());
-  if (res < 0 || res >= sizeof(buf)) {
+  if (res < 0 || res >= (int)sizeof(buf)) {
     fprintf(stderr, "snprintf(%s): %d\n", ev_name, res);
     goto error;
   }
@@ -1093,6 +1092,8 @@ int bpf_attach_tracepoint(int progfd, const char *tp_category,
 }
 
 int bpf_detach_tracepoint(const char *tp_category, const char *tp_name) {
+  tp_category = NULL;
+  tp_name = NULL;
   // Right now, there is nothing to do, but it's a good idea to encourage
   // callers to detach anything they attach.
   return 0;
@@ -1309,7 +1310,7 @@ int bpf_attach_xdp(const char *dev_name, int progfd, uint32_t flags) {
         goto cleanup;
     }
 
-    for (nh = (struct nlmsghdr *)buf; NLMSG_OK(nh, len);
+    for (nh = (struct nlmsghdr *)buf; NLMSG_OK(nh, (unsigned int)len);
          nh = NLMSG_NEXT(nh, len)) {
         if (nh->nlmsg_pid != sa.nl_pid) {
             fprintf(stderr, "bpf: Wrong pid %u, expected %u\n",
@@ -1317,7 +1318,7 @@ int bpf_attach_xdp(const char *dev_name, int progfd, uint32_t flags) {
             errno = EBADMSG;
             goto cleanup;
         }
-        if (nh->nlmsg_seq != seq) {
+        if (nh->nlmsg_seq != (unsigned int)seq) {
             fprintf(stderr, "bpf: Wrong seq %d, expected %d\n",
                    nh->nlmsg_seq, seq);
             errno = EBADMSG;

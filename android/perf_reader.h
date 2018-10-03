@@ -1,4 +1,6 @@
 /*
+ * eBPF library header borrowed from BCC project
+ * Copyright (C) 2018 The Android Open Source Project
  * Copyright (c) 2015 PLUMgrid, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");

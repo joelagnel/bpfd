@@ -1,3 +1,5 @@
+// eBPF library header borrowed from BCC project
+
 // This file is only needed to support build for CentOS 6
 // Remove it when no longer needed.
 // File is trivial and therefore is in public domain.

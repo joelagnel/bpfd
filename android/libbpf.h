@@ -20,6 +20,7 @@
 
 #include <linux/bpf.h>
 #include <functional>
+#include <string>
 #include <vector>
 #include "libbpf_bcc.h"
 
@@ -64,8 +65,10 @@ class BpfMap {
         BpfMap<Key, Value>(int fd) : mMapFd(fd){};
         BpfMap<Key, Value>(std::string pin_path) {
             int ret = bpf_obj_get(pin_path.c_str());
-            if (ret < 0)
-                throw new std::runtime_error("Cannot open pinned map location.");
+            if (ret < 0) {
+                printf("FATAL ERROR: Cannot open pinned map location.");
+                return;
+            }
 
             mPinnedPath = pin_path;
             mMapFd = ret;
@@ -117,7 +120,7 @@ class BpfMap {
             return ret;
         }
 
-        void reset(int fd = -1) {
+        void reset(void) {
             mMapFd = -1;
             mPinnedPath.clear();
         }
