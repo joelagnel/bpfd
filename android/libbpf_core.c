@@ -48,7 +48,7 @@
 #include <unistd.h>
 #include <linux/if_alg.h>
 
-#include "libbpf_bcc.h"
+#include "libbpf_core.h"
 #include "perf_reader.h"
 
 // TODO: Remove this when CentOS 6 support is not needed anymore

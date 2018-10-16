@@ -24,7 +24,7 @@
 #include <functional>
 #include <string>
 #include <vector>
-#include "libbpf_bcc.h"
+#include "libbpf_core.h"
 
 // Prototypes of map filter functions
 #define filter_key_t const std::function<int(const Key &key, const BpfMap<Key, Value> &map)>

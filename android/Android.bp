@@ -34,7 +34,7 @@ cc_library {
         android: {
             srcs: [
                 "loader.cc",
-                "libbpf_bcc.c",
+                "libbpf_core.c",
 		"perf_reader.c"
             ],
             sanitize: {

@@ -29,7 +29,7 @@
 #include <unistd.h>
 #include <linux/perf_event.h>
 
-#include "libbpf_bcc.h"
+#include "libbpf_core.h"
 #include "perf_reader.h"
 
 enum {
