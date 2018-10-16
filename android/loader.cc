@@ -632,7 +632,6 @@ int load_prog(const char *elfpath)
 		goto cleanup;
 	}
 
-	/* dump all code and rel sections */
 	ret = read_code_sections(elfpath, &cs);
 	if (ret) {
 		printf("couldn't read cs\n");
@@ -667,47 +666,3 @@ cleanup:
 
 }
 }
-/*
-int bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
-int bpf_attach_tracepoint(int progfd, const char *tp_category,
-                          const char *tp_name);
-*/
-
-#if 0
-int main()
-{
-	char elfpath[] = "timeinstate/bpf_kern.o";
-
-	int ret = load_prog(elfpath);
-	if (ret) {
-		printf("main: prog load failed\n");
-		return ret;
-	}
-
-	android::bpf::BpfMap<int, int> m;
-	m.clear();
-
-	return 0;
-
-	for (; cs; cs = cs->next) {
-		char fname[20];
-		FILE *f;
-
-		strcpy(fname, "code_");
-		strcat(fname, cs->name);
-		deslash(fname);
-
-		f = fopen(fname, "w+");
-		fwrite(cs->data, cs->data_len, 1, f);
-
-		strcpy(fname, "rel_");
-		strcat(fname, cs->name);
-		deslash(fname);
-
-		f = fopen(fname, "w+");
-		fwrite(cs->rel_data, cs->rel_data_len, 1, f);
-	}
-	if (license) free(license);
-	return 0;
-}
-#endif
