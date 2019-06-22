@@ -7,6 +7,11 @@ BPFd is not undergoing active development at the moment, and Android has
 switched to using androdeb for running BCC. However BPFd is still available in
 this repository and if you want to use BPFd with BCC, please look at this [pull
 request](https://github.com/iovisor/bcc/pull/1675) to get needed BCC support.
+Also please see the discussion [on this thread](https://github.com/iovisor/bcc/pull/2298)
+Also note that, future development of eBPF tracing tools on Android is focusing
+on running bpftrace on Android as that is where the community is moving towards.
+I will keep everyone updated about the developments, if you are interested in this
+area, let me know if you want me to add you to my email notification list.
 
 BPFd faciliates easier loading of eBPF programs using simple stdio interface.
 
