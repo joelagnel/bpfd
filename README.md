@@ -14,6 +14,8 @@ is where the community is moving towards. I will keep everyone updated about the
 developments, if you are interested in this area, let me know if you want me to
 add you to my email notification list (Also share your company name and project).
 
+If you still want to work on BPFd, you are most likely on your own. See below for BPFd design.
+
 BPFd faciliates easier loading of eBPF programs using simple stdio interface.
 
 One of the main usescases of this work is easier running of BCC tools across
